@@ -1,0 +1,32 @@
+{
+	"name": "pulseguide",
+	"version": "0.1.0",
+	"type": "module",
+	"license": "MIT",
+	"author": "Hart Phoenix <rhhart@gmail.com>",
+	"repository": "https://github.com/hartphoenix/pulseguide.git",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"react": "^19",
+		"react-dom": "^19"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "latest",
+		"@types/bun": "latest",
+		"@types/react": "latest",
+		"@types/react-dom": "latest",
+		"@vitejs/plugin-react": "latest",
+		"typescript": "latest",
+		"vite": "latest"
+	},
+	"trustedDependencies": ["@biomejs/biome"]
+}
