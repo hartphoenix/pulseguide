@@ -1,2 +1,7 @@
-export type { PlaybackAdapter } from "./types";
-export { parseYouTubeVideoId, YouTubeEmbedAdapter } from "./youtube-embed";
+export type { PlaybackAdapter, PlaybackState } from "pulsemap/sdk";
+export {
+	createRegistry,
+	parseYouTubeVideoId,
+	YouTubeEmbedAdapter,
+	youTubeEmbedMatcher,
+} from "pulsemap/sdk";

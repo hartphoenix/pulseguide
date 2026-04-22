@@ -18,7 +18,16 @@
 		}
 	},
 	"files": {
-		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.css", "**/*.html"]
+		"includes": [
+			"**/*.ts",
+			"**/*.tsx",
+			"**/*.js",
+			"**/*.jsx",
+			"**/*.css",
+			"**/*.html",
+			"!dist",
+			"!node_modules"
+		]
 	},
 	"linter": {
 		"enabled": true,
