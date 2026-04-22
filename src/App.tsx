@@ -1,7 +1,8 @@
+import { parseYouTubeVideoId, YouTubeEmbedAdapter } from "pulsemap/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseYouTubeVideoId, YouTubeEmbedAdapter } from "./adapters/youtube-embed";
 import { DebugPanel } from "./components/DebugPanel";
 import { MapLoader } from "./components/MapLoader";
+import { PlaybackControls } from "./components/PlaybackControls";
 import type { SyncState } from "./sync/engine";
 import { SyncEngine } from "./sync/engine";
 import type { PulseMap } from "./types/pulsemap";
@@ -46,15 +47,18 @@ export function App() {
 	useEffect(() => {
 		if (!videoId) return;
 
-		const adapter = new YouTubeEmbedAdapter(
-			"yt-player",
+		const adapter = new YouTubeEmbedAdapter({
+			elementId: "yt-player",
 			videoId,
-			() => {
-				setAdapterReady(true);
-				setVideoTitle(adapter.getVideoTitle());
-			},
-			() => {},
-		);
+		});
+
+		adapter.waitForReady().then(() => {
+			setAdapterReady(true);
+			setVideoTitle(adapter.getVideoTitle());
+		});
+
+		adapter.onStateChange(() => {});
+
 		adapterRef.current = adapter;
 
 		return () => {
@@ -129,6 +133,14 @@ export function App() {
 					<div style={{ fontSize: 13, color: "#888" }}>
 						<strong>Video:</strong> {videoTitle}
 					</div>
+				)}
+
+				{adapterReady && (
+					<PlaybackControls
+						adapter={adapterRef.current}
+						playing={syncState?.playing ?? false}
+						rate={syncState?.rate ?? 1}
+					/>
 				)}
 
 				<div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
