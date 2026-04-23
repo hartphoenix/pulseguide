@@ -1,11 +1,19 @@
 import type { PlaybackAdapter } from "../adapters/types";
-import type { BeatEvent, ChordEvent, LyricLine, PulseMap, Section } from "../types/pulsemap";
+import type {
+	BeatEvent,
+	ChordEvent,
+	LyricLine,
+	PulseMap,
+	Section,
+	WordEvent,
+} from "../types/pulsemap";
 
 export interface SyncState {
 	position: number;
 	playing: boolean;
 	rate: number;
 	currentLyric: LyricLine | null;
+	currentWord: WordEvent | null;
 	currentChord: ChordEvent | null;
 	currentSection: Section | null;
 	currentBeat: BeatEvent | null;
@@ -91,6 +99,7 @@ export class SyncEngine {
 		const rate = this.adapter.getPlaybackRate();
 
 		const currentLyric = findCurrent(this.map.lyrics, position);
+		const currentWord = findCurrent(this.map.words, position);
 		const currentChord = findCurrent(this.map.chords, position);
 		const currentSection = findCurrent(this.map.sections, position);
 		const currentBeat = findCurrentBeat(this.map.beats, position);
@@ -103,6 +112,7 @@ export class SyncEngine {
 			playing,
 			rate,
 			currentLyric,
+			currentWord,
 			currentChord,
 			currentSection,
 			currentBeat,

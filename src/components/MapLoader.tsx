@@ -1,10 +1,16 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PulseMap } from "../types/pulsemap";
 
-const DEMO_MAPS = [
-	{ label: "Bohemian Rhapsody — Queen", path: "/maps/bohemian-rhapsody.json" },
-	{ label: "The Keys — Matt Duncan", path: "/maps/the-keys.json" },
-];
+interface MapEntry {
+	file: string;
+	path: string;
+	id: string;
+	title: string;
+	artist: string;
+	hasLyrics: boolean;
+	hasWords: boolean;
+	hasChords: boolean;
+}
 
 export function MapLoader({
 	onMapLoaded,
@@ -12,6 +18,14 @@ export function MapLoader({
 	onMapLoaded: (map: PulseMap, source: string) => void;
 }) {
 	const fileRef = useRef<HTMLInputElement>(null);
+	const [maps, setMaps] = useState<MapEntry[]>([]);
+
+	useEffect(() => {
+		fetch("/maps/manifest.json")
+			.then((res) => res.json())
+			.then((data: MapEntry[]) => setMaps(data))
+			.catch(() => {});
+	}, []);
 
 	async function handleFile(file: File) {
 		const text = await file.text();
@@ -19,29 +33,32 @@ export function MapLoader({
 		onMapLoaded(map, file.name);
 	}
 
-	async function handleDemoSelect(path: string) {
+	async function handleSelect(path: string) {
 		if (!path) return;
 		const res = await fetch(path);
 		const map = (await res.json()) as PulseMap;
-		onMapLoaded(map, path.split("/").pop()!);
+		const filename = path.split("/").pop() ?? path;
+		onMapLoaded(map, filename);
 	}
 
 	return (
 		<div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-			<select
-				onChange={(e) => handleDemoSelect(e.target.value)}
-				defaultValue=""
-				style={{ padding: 4 }}
-			>
-				<option value="" disabled>
-					Demo maps...
-				</option>
-				{DEMO_MAPS.map((m) => (
-					<option key={m.path} value={m.path}>
-						{m.label}
+			{maps.length > 0 && (
+				<select
+					onChange={(e) => handleSelect(e.target.value)}
+					defaultValue=""
+					style={{ padding: 4, maxWidth: 260 }}
+				>
+					<option value="" disabled>
+						Maps ({maps.length})...
 					</option>
-				))}
-			</select>
+					{maps.map((m) => (
+						<option key={m.id} value={m.path}>
+							{m.title} — {m.artist}
+						</option>
+					))}
+				</select>
+			)}
 			<span style={{ color: "#888" }}>or</span>
 			<input
 				ref={fileRef}
