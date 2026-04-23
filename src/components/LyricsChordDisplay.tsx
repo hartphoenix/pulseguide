@@ -17,7 +17,54 @@ interface Measure {
 interface SectionGroup {
 	section: Section;
 	entries: DisplayEntry[];
-	measures: Measure[];
+}
+
+function normalize(s: string): string {
+	return s.toLowerCase().replace(/[^a-z0-9']/g, "");
+}
+
+function alignWordsToLine(
+	lineText: string,
+	lineT: number,
+	words: WordEvent[],
+	usedIndices: Set<number>,
+): WordEvent[] {
+	const lineTextWords = lineText.split(/\s+/).filter(Boolean);
+	const n = lineTextWords.length;
+	if (n === 0 || words.length === 0) return [];
+
+	let bestStart = -1;
+	let bestDist = Number.POSITIVE_INFINITY;
+
+	for (let start = 0; start <= words.length - n; start++) {
+		let anyUsed = false;
+		for (let j = start; j < start + n; j++) {
+			if (usedIndices.has(j)) {
+				anyUsed = true;
+				break;
+			}
+		}
+		if (anyUsed) continue;
+
+		const matches = lineTextWords.every(
+			(lw, idx) => normalize(words[start + idx].text) === normalize(lw),
+		);
+		if (!matches) continue;
+
+		const dist = Math.abs(words[start].t - lineT);
+		if (dist < bestDist) {
+			bestDist = dist;
+			bestStart = start;
+		}
+	}
+
+	if (bestStart < 0) return [];
+
+	const result = words.slice(bestStart, bestStart + n);
+	for (let j = bestStart; j < bestStart + n; j++) {
+		usedIndices.add(j);
+	}
+	return result;
 }
 
 function buildEntries(
@@ -25,46 +72,24 @@ function buildEntries(
 	words: WordEvent[],
 	chords: ChordEvent[],
 ): DisplayEntry[] {
-	let wordCursor = 0;
+	const usedWordIndices = new Set<number>();
 	const entries: DisplayEntry[] = [];
 	let chordCursor = 0;
 
 	for (let i = 0; i < lyrics.length; i++) {
 		const line = lyrics[i];
-		const expectedCount = line.text.split(/\s+/).filter(Boolean).length;
-		const lineWords: WordEvent[] = [];
+		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices);
 
-		for (let j = 0; j < expectedCount && wordCursor < words.length; j++) {
-			lineWords.push(words[wordCursor]);
-			wordCursor++;
-		}
+		// Use line.t for chord boundaries, not word timestamps (words can be pickups far from line.t)
+		const chordStart = line.t - CHORD_WORD_TOLERANCE;
+		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;
+		const chordEnd = Math.min(
+			lineWords.length > 0 ? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE : line.t + CHORD_WORD_TOLERANCE,
+			nextLineT,
+		);
 
-		if (i < lyrics.length - 1) {
-			const nextLineWords = lyrics[i + 1].text.split(/\s+/).filter(Boolean);
-			const nextLineT = lyrics[i + 1].t;
-			while (wordCursor < words.length && words[wordCursor].t < nextLineT) {
-				const remaining = words.slice(wordCursor, wordCursor + nextLineWords.length);
-				const isPickup =
-					remaining.length >= nextLineWords.length &&
-					nextLineWords.every((nw, idx) => remaining[idx].text.toLowerCase() === nw.toLowerCase());
-				if (isPickup) break;
-				lineWords.push(words[wordCursor]);
-				wordCursor++;
-			}
-		}
-
-		const lineStart = lineWords.length > 0 ? lineWords[0].t : line.t;
-		const lineEnd =
-			lineWords.length > 0
-				? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE
-				: (line.end ?? lineStart + CHORD_WORD_TOLERANCE);
-
-		// Collect chords before this line as a standalone chord row
 		const preChords: ChordEvent[] = [];
-		while (
-			chordCursor < chords.length &&
-			chords[chordCursor].t < lineStart - CHORD_WORD_TOLERANCE
-		) {
+		while (chordCursor < chords.length && chords[chordCursor].t < chordStart) {
 			preChords.push(chords[chordCursor]);
 			chordCursor++;
 		}
@@ -72,9 +97,8 @@ function buildEntries(
 			entries.push({ kind: "chords", chords: preChords, t: preChords[0].t });
 		}
 
-		// Collect chords that belong with this line (close to a word)
 		const lineChords: ChordEvent[] = [];
-		while (chordCursor < chords.length && chords[chordCursor].t <= lineEnd) {
+		while (chordCursor < chords.length && chords[chordCursor].t <= chordEnd) {
 			lineChords.push(chords[chordCursor]);
 			chordCursor++;
 		}
@@ -82,7 +106,6 @@ function buildEntries(
 		entries.push({ kind: "lyric", line, words: lineWords, chords: lineChords });
 	}
 
-	// Remaining chords after last lyric
 	const postChords: ChordEvent[] = [];
 	while (chordCursor < chords.length) {
 		postChords.push(chords[chordCursor]);
@@ -117,10 +140,9 @@ function buildMeasures(beats: BeatEvent[], start: number, end: number): Measure[
 function groupBySection(
 	entries: DisplayEntry[],
 	sections: Section[],
-	beats: BeatEvent[],
 ): SectionGroup[] {
 	if (!sections.length) {
-		return [{ section: { t: 0, type: "", end: Number.POSITIVE_INFINITY }, entries, measures: [] }];
+		return [{ section: { t: 0, type: "", end: Number.POSITIVE_INFINITY }, entries }];
 	}
 
 	return sections.map((section) => {
@@ -129,16 +151,7 @@ function groupBySection(
 			return t >= section.t && t < section.end;
 		});
 
-		const hasLyrics = sectionEntries.some((e) => e.kind === "lyric");
-		let measures: Measure[] = [];
-		if (!hasLyrics && sectionEntries.length === 0) {
-			const sectionChords = sectionEntries.filter((e) => e.kind === "chords");
-			if (sectionChords.length === 0) {
-				measures = buildMeasures(beats, section.t, section.end);
-			}
-		}
-
-		return { section, entries: sectionEntries, measures };
+		return { section, entries: sectionEntries };
 	});
 }
 
@@ -180,6 +193,8 @@ function ChordRow({
 				fontWeight: 600,
 				color: "#e8b84b",
 				cursor: "pointer",
+				display: "flex",
+				flexWrap: "wrap",
 			}}
 		>
 			{chords.map((c) => {
@@ -227,9 +242,7 @@ function MeasureChart({
 					style={{ display: "flex", fontFamily: "inherit", fontSize: 16, lineHeight: 1.8 }}
 				>
 					{row.map((measure, idx) => {
-						const isActive = position >= measure.t && position < measure.end;
-						const chordText =
-							measure.chords.length > 0 ? measure.chords.map((c) => c.chord).join("  ") : "";
+						const measureActive = position >= measure.t && position < measure.end;
 						return (
 							<div
 								key={measure.t}
@@ -240,12 +253,30 @@ function MeasureChart({
 									cursor: "pointer",
 									borderLeft: "1px solid #333",
 									borderRight: idx === row.length - 1 ? "1px solid #333" : "none",
-									color: isActive ? "#e8b84b" : "#777",
-									fontWeight: isActive ? 600 : 400,
-									transition: "color 0.15s",
-								}}
+									}}
 							>
-								{chordText || <span style={{ color: "#333" }}>{"/ ".repeat(3).trim()}</span>}
+								{measure.chords.length > 0
+									? measure.chords.map((c) => {
+											const chordActive = position >= c.t && position < (c.end ?? measure.end);
+											return (
+												<span
+													key={c.t}
+													style={{
+														color: chordActive ? "#e8b84b" : "#777",
+														fontWeight: chordActive ? 600 : 400,
+														transition: "color 0.1s",
+														marginRight: 8,
+													}}
+												>
+													{c.chord}
+												</span>
+											);
+										})
+									: (
+										<span style={{ color: measureActive ? "#555" : "#333" }}>
+											{"/ ".repeat(3).trim()}
+										</span>
+									)}
 							</div>
 						);
 					})}
@@ -327,7 +358,7 @@ function ChordWordLine({
 		>
 			{entry.words.map((word, wordIdx) => {
 				const chord = findChordForWord(word, entry.chords);
-				const isActiveWord = word.t === activeWordT;
+				const isActiveWord = isActiveLine && word.t === activeWordT;
 				const showChord = chord && !usedChords.has(chord);
 				if (chord) usedChords.add(chord);
 
@@ -374,12 +405,34 @@ function ChordWordLine({
 	);
 }
 
+const MEASURE_CHART_THRESHOLD = 6;
+
+function renderChordEntry(
+	entry: Extract<DisplayEntry, { kind: "chords" }>,
+	position: number,
+	onSeek: (ms: number) => void,
+	beats: BeatEvent[],
+) {
+	if (entry.chords.length <= MEASURE_CHART_THRESHOLD) {
+		return <ChordRow key={`cr-${entry.t}`} chords={entry.chords} position={position} onSeek={onSeek} />;
+	}
+	const start = entry.chords[0].t;
+	const end = entry.chords[entry.chords.length - 1].end ?? entry.chords[entry.chords.length - 1].t + 5000;
+	const measures = buildMeasures(beats, start, end);
+	for (const chord of entry.chords) {
+		const measure = measures.find((m) => chord.t >= m.t && chord.t < m.end);
+		if (measure) measure.chords.push(chord);
+	}
+	return <MeasureChart key={`mc-${entry.t}`} measures={measures} position={position} onSeek={onSeek} />;
+}
+
 function SectionBlock({
 	group,
 	activeLineT,
 	activeWordT,
 	activeSection,
 	position,
+	beats,
 	onSeek,
 	activeRef,
 }: {
@@ -388,20 +441,20 @@ function SectionBlock({
 	activeWordT: number | null;
 	activeSection: Section | null;
 	position: number;
+	beats: BeatEvent[];
 	onSeek: (ms: number) => void;
 	activeRef: React.RefObject<HTMLDivElement | null>;
 }) {
 	const label = formatSectionLabel(group.section);
 	const isActiveSection = activeSection?.t === group.section.t;
 	const hasEntries = group.entries.length > 0;
-	const hasMeasures = group.measures.length > 0;
 
 	return (
 		<div
 			style={{
 				display: "flex",
 				gap: 16,
-				marginBottom: hasEntries || hasMeasures ? 20 : 12,
+				marginBottom: hasEntries ? 20 : 12,
 			}}
 		>
 			<div
@@ -422,14 +475,7 @@ function SectionBlock({
 			<div style={{ flex: 1, minWidth: 0 }}>
 				{group.entries.map((entry) => {
 					if (entry.kind === "chords") {
-						return (
-							<ChordRow
-								key={`cr-${entry.t}`}
-								chords={entry.chords}
-								position={position}
-								onSeek={onSeek}
-							/>
-						);
+						return renderChordEntry(entry, position, onSeek, beats);
 					}
 					const isActive = entry.line.t === activeLineT;
 					return (
@@ -443,10 +489,7 @@ function SectionBlock({
 						/>
 					);
 				})}
-				{hasMeasures && (
-					<MeasureChart measures={group.measures} position={position} onSeek={onSeek} />
-				)}
-				{!hasEntries && !hasMeasures && (
+				{!hasEntries && (
 					<div style={{ padding: "8px 0", fontSize: 14, color: "#444", fontStyle: "italic" }}>
 						{group.section.type === "solo"
 							? "Solo"
@@ -507,7 +550,7 @@ export function LyricsChordDisplay({
 	}, [activeLineT]);
 
 	const entries = buildEntries(lyrics, words, chords);
-	const groups = groupBySection(entries, sections, beats);
+	const groups = groupBySection(entries, sections);
 
 	if (!lyrics.length && !chords.length) {
 		return <div style={{ padding: 16, color: "#888" }}>No lyrics or chords in this map.</div>;
@@ -532,6 +575,7 @@ export function LyricsChordDisplay({
 						activeWordT={activeWordT}
 						activeSection={activeSection}
 						position={position}
+						beats={beats}
 						onSeek={onSeek}
 						activeRef={activeRef}
 					/>
