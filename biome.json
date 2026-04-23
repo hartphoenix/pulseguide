@@ -32,7 +32,18 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"correctness": {
+				"useExhaustiveDependencies": "warn"
+			},
+			"suspicious": {
+				"noArrayIndexKey": "warn"
+			},
+			"a11y": {
+				"useSemanticElements": "warn",
+				"noStaticElementInteractions": "warn",
+				"useKeyWithClickEvents": "warn"
+			}
 		}
 	}
 }

@@ -8,8 +8,10 @@ export type {
 	MidiReference,
 	MidiTrack,
 	PlaybackCapabilities,
+	PlaybackRestrictions,
 	PlaybackTarget,
 	PulseMap,
 	Section,
 	SectionType,
+	WordEvent,
 } from "pulsemap/schema";
