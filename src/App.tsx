@@ -65,8 +65,6 @@ export function App() {
 			setVideoTitle(adapter.getVideoTitle());
 		});
 
-		adapter.onStateChange(() => {});
-
 		adapterRef.current = adapter;
 
 		return () => {
