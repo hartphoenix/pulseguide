@@ -1,179 +1,18 @@
 import { useEffect, useRef } from "react";
+import {
+	buildEntries,
+	buildMeasures,
+	type DisplayEntry,
+	findChordForWord,
+	formatSectionLabel,
+	groupBySection,
+	type Measure,
+	type SectionGroup,
+} from "../display/layout";
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
 
+// Active line sits at 15% from top of scroll container (Hart specified 10-20%).
 const SCROLL_TARGET_RATIO = 0.15;
-const CHORD_WORD_TOLERANCE = 500;
-
-type DisplayEntry =
-	| { kind: "lyric"; line: LyricLine; words: WordEvent[]; chords: ChordEvent[] }
-	| { kind: "chords"; chords: ChordEvent[]; t: number };
-
-interface Measure {
-	t: number;
-	end: number;
-	chords: ChordEvent[];
-}
-
-interface SectionGroup {
-	section: Section;
-	entries: DisplayEntry[];
-}
-
-function normalize(s: string): string {
-	return s.toLowerCase().replace(/[^a-z0-9']/g, "");
-}
-
-function alignWordsToLine(
-	lineText: string,
-	lineT: number,
-	words: WordEvent[],
-	usedIndices: Set<number>,
-): WordEvent[] {
-	const lineTextWords = lineText.split(/\s+/).filter(Boolean);
-	const n = lineTextWords.length;
-	if (n === 0 || words.length === 0) return [];
-
-	let bestStart = -1;
-	let bestDist = Number.POSITIVE_INFINITY;
-
-	for (let start = 0; start <= words.length - n; start++) {
-		let anyUsed = false;
-		for (let j = start; j < start + n; j++) {
-			if (usedIndices.has(j)) {
-				anyUsed = true;
-				break;
-			}
-		}
-		if (anyUsed) continue;
-
-		const matches = lineTextWords.every(
-			(lw, idx) => normalize(words[start + idx].text) === normalize(lw),
-		);
-		if (!matches) continue;
-
-		const dist = Math.abs(words[start].t - lineT);
-		if (dist < bestDist) {
-			bestDist = dist;
-			bestStart = start;
-		}
-	}
-
-	if (bestStart < 0) return [];
-
-	const result = words.slice(bestStart, bestStart + n);
-	for (let j = bestStart; j < bestStart + n; j++) {
-		usedIndices.add(j);
-	}
-	return result;
-}
-
-function buildEntries(
-	lyrics: LyricLine[],
-	words: WordEvent[],
-	chords: ChordEvent[],
-): DisplayEntry[] {
-	const usedWordIndices = new Set<number>();
-	const entries: DisplayEntry[] = [];
-	let chordCursor = 0;
-
-	for (let i = 0; i < lyrics.length; i++) {
-		const line = lyrics[i];
-		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices);
-
-		// Use line.t for chord boundaries, not word timestamps (words can be pickups far from line.t)
-		const chordStart = line.t - CHORD_WORD_TOLERANCE;
-		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;
-		const chordEnd = Math.min(
-			lineWords.length > 0
-				? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE
-				: line.t + CHORD_WORD_TOLERANCE,
-			nextLineT,
-		);
-
-		const preChords: ChordEvent[] = [];
-		while (chordCursor < chords.length && chords[chordCursor].t < chordStart) {
-			preChords.push(chords[chordCursor]);
-			chordCursor++;
-		}
-		if (preChords.length > 0) {
-			entries.push({ kind: "chords", chords: preChords, t: preChords[0].t });
-		}
-
-		const lineChords: ChordEvent[] = [];
-		while (chordCursor < chords.length && chords[chordCursor].t <= chordEnd) {
-			lineChords.push(chords[chordCursor]);
-			chordCursor++;
-		}
-
-		entries.push({ kind: "lyric", line, words: lineWords, chords: lineChords });
-	}
-
-	const postChords: ChordEvent[] = [];
-	while (chordCursor < chords.length) {
-		postChords.push(chords[chordCursor]);
-		chordCursor++;
-	}
-	if (postChords.length > 0) {
-		entries.push({ kind: "chords", chords: postChords, t: postChords[0].t });
-	}
-
-	return entries;
-}
-
-function buildMeasures(beats: BeatEvent[], start: number, end: number): Measure[] {
-	const measures: Measure[] = [];
-	const sectionBeats = beats.filter((b) => b.t >= start && b.t < end);
-
-	for (let i = 0; i < sectionBeats.length; i++) {
-		if (!sectionBeats[i].downbeat && measures.length === 0) continue;
-		if (sectionBeats[i].downbeat) {
-			const nextDownbeat = sectionBeats.find((b, j) => j > i && b.downbeat);
-			measures.push({
-				t: sectionBeats[i].t,
-				end: nextDownbeat ? nextDownbeat.t : end,
-				chords: [],
-			});
-		}
-	}
-
-	return measures;
-}
-
-function groupBySection(entries: DisplayEntry[], sections: Section[]): SectionGroup[] {
-	if (!sections.length) {
-		return [{ section: { t: 0, type: "", end: Number.POSITIVE_INFINITY }, entries }];
-	}
-
-	return sections.map((section) => {
-		const sectionEntries = entries.filter((e) => {
-			const t = e.kind === "lyric" ? (e.words.length > 0 ? e.words[0].t : e.line.t) : e.t;
-			return t >= section.t && t < section.end;
-		});
-
-		return { section, entries: sectionEntries };
-	});
-}
-
-function formatSectionLabel(section: Section): string {
-	if (section.label) return section.label;
-	if (section.type && section.type !== "section") {
-		return section.type.charAt(0).toUpperCase() + section.type.slice(1);
-	}
-	return "";
-}
-
-function findChordForWord(word: WordEvent, lineChords: ChordEvent[]): ChordEvent | null {
-	let best: ChordEvent | null = null;
-	let bestDist = CHORD_WORD_TOLERANCE + 1;
-	for (const chord of lineChords) {
-		const dist = Math.abs(chord.t - word.t);
-		if (dist < bestDist) {
-			bestDist = dist;
-			best = chord;
-		}
-	}
-	return best;
-}
 
 function ChordRow({
 	chords,
@@ -404,6 +243,8 @@ function ChordWordLine({
 	);
 }
 
+// Chord groups larger than this render as measure charts with bar lines; smaller groups
+// render as an inline row. 6 chords fit comfortably on one line.
 const MEASURE_CHART_THRESHOLD = 6;
 
 function renderChordEntry(
