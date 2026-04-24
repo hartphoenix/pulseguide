@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { alignWordsToLine, buildEntries, normalize } from "../../src/display/layout";
-import type { ChordEvent, LyricLine, WordEvent } from "../../src/types/pulsemap";
+import { alignWordsToLine, buildEntries, buildMeasures, normalize } from "../../src/display/layout";
+import type { BeatEvent, ChordEvent, LyricLine, WordEvent } from "../../src/types/pulsemap";
 
 describe("normalize", () => {
 	test("lowercases and strips non-alphanumeric except apostrophes", () => {
@@ -166,5 +166,135 @@ describe("buildEntries", () => {
 		if (chordEntries[0].kind === "chords") {
 			expect(chordEntries[0].chords[0].chord).toBe("Am");
 		}
+	});
+
+	test("splits large post-lyric chord groups by time span", () => {
+		const lyrics: LyricLine[] = [{ t: 1000, text: "hello", end: 2000 }];
+		const words: WordEvent[] = [{ t: 1000, text: "hello" }];
+		// 6 chords spanning 50 seconds — should be split into multiple entries
+		const chords: ChordEvent[] = [
+			{ t: 1100, chord: "C" },
+			{ t: 10000, chord: "G" },
+			{ t: 20000, chord: "Am" },
+			{ t: 30000, chord: "F" },
+			{ t: 40000, chord: "Dm" },
+			{ t: 51000, chord: "Bb" },
+		];
+
+		const entries = buildEntries(lyrics, words, chords);
+		const chordEntries = entries.filter((e) => e.kind === "chords");
+		// First chord attaches to the lyric line; remaining 5 span 41 seconds (10000-51000)
+		// With 20s max span, should split into multiple entries
+		expect(chordEntries.length).toBeGreaterThan(1);
+		// All post-lyric chords should still be present across all entries
+		const allChords = chordEntries.flatMap((e) => (e.kind === "chords" ? e.chords : []));
+		expect(allChords.map((c) => c.chord)).toEqual(["G", "Am", "F", "Dm", "Bb"]);
+	});
+
+	test("beat-informed boundary: chords beyond 1 bar after last word become standalone", () => {
+		const lyrics: LyricLine[] = [{ t: 1000, text: "hello world", end: 5000 }];
+		const words: WordEvent[] = [
+			{ t: 1000, text: "hello" },
+			{ t: 1500, text: "world" },
+		];
+		// Beats: downbeats at 0, 2000, 4000, 6000 (2-second bars)
+		const beats: BeatEvent[] = [
+			{ t: 0, downbeat: true },
+			{ t: 1000, downbeat: false },
+			{ t: 2000, downbeat: true },
+			{ t: 3000, downbeat: false },
+			{ t: 4000, downbeat: true },
+			{ t: 5000, downbeat: false },
+			{ t: 6000, downbeat: true },
+		];
+		// Last word at 1500. First downbeat after 1500 = 2000, second = 4000.
+		// Chord window extends to 4000. Chord at 3000 is in, chord at 5000 is out.
+		const chords: ChordEvent[] = [
+			{ t: 1100, chord: "C" },
+			{ t: 3000, chord: "G" },
+			{ t: 5000, chord: "Am" },
+		];
+
+		const entries = buildEntries(lyrics, words, chords, beats);
+		const lyricEntry = entries.find((e) => e.kind === "lyric");
+		if (lyricEntry?.kind === "lyric") {
+			expect(lyricEntry.chords.map((c) => c.chord)).toEqual(["C", "G"]);
+		}
+		const chordEntries = entries.filter((e) => e.kind === "chords");
+		expect(chordEntries).toHaveLength(1);
+		if (chordEntries[0].kind === "chords") {
+			expect(chordEntries[0].chords[0].chord).toBe("Am");
+		}
+	});
+
+	test("falls back to fixed budget when no beat data", () => {
+		const lyrics: LyricLine[] = [{ t: 1000, text: "hello", end: 10000 }];
+		const words: WordEvent[] = [{ t: 1000, text: "hello" }];
+		// No beats provided — falls back to ~2 second budget past last word (t=1000)
+		// Chord at 2500 is within 2s, chord at 5000 is outside
+		const chords: ChordEvent[] = [
+			{ t: 1100, chord: "C" },
+			{ t: 2500, chord: "G" },
+			{ t: 5000, chord: "Am" },
+		];
+
+		const entries = buildEntries(lyrics, words, chords);
+		const lyricEntry = entries.find((e) => e.kind === "lyric");
+		if (lyricEntry?.kind === "lyric") {
+			expect(lyricEntry.chords.map((c) => c.chord)).toEqual(["C", "G"]);
+		}
+	});
+
+	test("does not split standalone entries under the span limit", () => {
+		const chords: ChordEvent[] = [
+			{ t: 0, chord: "C" },
+			{ t: 5000, chord: "G" },
+			{ t: 10000, chord: "Am" },
+		];
+		const entries = buildEntries([], [], chords);
+		// 10 seconds total span — under 20s limit, stays as one entry
+		expect(entries).toHaveLength(1);
+		expect(entries[0].kind).toBe("chords");
+	});
+});
+
+describe("buildMeasures", () => {
+	test("creates pickup measure for chords before first downbeat", () => {
+		const beats: BeatEvent[] = [
+			{ t: 1000, downbeat: false },
+			{ t: 1500, downbeat: false },
+			{ t: 2000, downbeat: true },
+			{ t: 2500, downbeat: false },
+			{ t: 3000, downbeat: true },
+		];
+		const measures = buildMeasures(beats, 800, 3500);
+		// First measure should be the pickup: 800 to 2000
+		expect(measures[0].t).toBe(800);
+		expect(measures[0].end).toBe(2000);
+		// Second measure: 2000 to 3000
+		expect(measures[1].t).toBe(2000);
+		expect(measures[1].end).toBe(3000);
+	});
+
+	test("creates a single measure when no downbeats exist in range", () => {
+		const beats: BeatEvent[] = [
+			{ t: 1000, downbeat: false },
+			{ t: 1500, downbeat: false },
+		];
+		const measures = buildMeasures(beats, 800, 2000);
+		expect(measures).toHaveLength(1);
+		expect(measures[0].t).toBe(800);
+		expect(measures[0].end).toBe(2000);
+	});
+
+	test("no pickup when first downbeat aligns with start", () => {
+		const beats: BeatEvent[] = [
+			{ t: 1000, downbeat: true },
+			{ t: 2000, downbeat: true },
+		];
+		const measures = buildMeasures(beats, 1000, 3000);
+		expect(measures[0].t).toBe(1000);
+		expect(measures[0].end).toBe(2000);
+		expect(measures).toHaveLength(2);
 	});
 });

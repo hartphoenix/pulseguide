@@ -1,8 +1,15 @@
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
 
-// ms window for associating a chord with a lyric line vs. leaving it standalone.
-// 500ms catches syncopated chord changes without pulling in chords from adjacent passages.
+// ms window for associating a chord with the start of a lyric line (pickup chords).
 export const CHORD_WORD_TOLERANCE = 500;
+
+// Fallback chord window past last word when beat data is unavailable.
+// ~2 seconds approximates one bar at moderate tempo.
+const LINE_CHORD_FALLBACK = 2000;
+
+// Standalone chord entries spanning more than this are split into smaller groups.
+// 20 seconds ≈ 8 bars at moderate tempo — two systems on a lead sheet.
+const CHORD_GROUP_MAX_SPAN = 20000;
 
 export type DisplayEntry =
 	| { kind: "lyric"; line: LyricLine; words: WordEvent[]; chords: ChordEvent[] }
@@ -83,10 +90,42 @@ export function alignWordsToLine(
 	return result;
 }
 
+// Find the timestamp one full bar after `t`: the second downbeat past `t`.
+function barBoundaryAfter(t: number, beats: BeatEvent[]): number | null {
+	let firstDownbeat = -1;
+	for (const beat of beats) {
+		if (beat.t > t && beat.downbeat) {
+			if (firstDownbeat < 0) {
+				firstDownbeat = beat.t;
+			} else {
+				return beat.t;
+			}
+		}
+	}
+	return null;
+}
+
+function pushChordEntries(entries: DisplayEntry[], chords: ChordEvent[]): void {
+	if (chords.length === 0) return;
+	let groupStart = 0;
+	for (let i = 1; i < chords.length; i++) {
+		if (chords[i].t - chords[groupStart].t > CHORD_GROUP_MAX_SPAN) {
+			entries.push({
+				kind: "chords",
+				chords: chords.slice(groupStart, i),
+				t: chords[groupStart].t,
+			});
+			groupStart = i;
+		}
+	}
+	entries.push({ kind: "chords", chords: chords.slice(groupStart), t: chords[groupStart].t });
+}
+
 export function buildEntries(
 	lyrics: LyricLine[],
 	words: WordEvent[],
 	chords: ChordEvent[],
+	beats: BeatEvent[] = [],
 ): DisplayEntry[] {
 	const usedWordIndices = new Set<number>();
 	const entries: DisplayEntry[] = [];
@@ -96,16 +135,14 @@ export function buildEntries(
 		const line = lyrics[i];
 		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices);
 
-		// Chord boundaries use line.t (the phrase's canonical position), not the first
-		// word's timestamp. LRCLIB lyric line `end` values extend to the next line's start,
-		// which can be minutes later across an instrumental break. Using line.t prevents
-		// an entire instrumental section's chords from being swallowed by one lyric line.
 		const chordStart = line.t - CHORD_WORD_TOLERANCE;
 		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;
+
+		// Chord window extends one full bar past the last word (beat-informed).
+		// Falls back to a fixed budget when beat data is unavailable.
+		const anchorT = lineWords.length > 0 ? lineWords[lineWords.length - 1].t : line.t;
 		const chordEnd = Math.min(
-			lineWords.length > 0
-				? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE
-				: line.t + CHORD_WORD_TOLERANCE,
+			barBoundaryAfter(anchorT, beats) ?? anchorT + LINE_CHORD_FALLBACK,
 			nextLineT,
 		);
 
@@ -114,9 +151,7 @@ export function buildEntries(
 			preChords.push(chords[chordCursor]);
 			chordCursor++;
 		}
-		if (preChords.length > 0) {
-			entries.push({ kind: "chords", chords: preChords, t: preChords[0].t });
-		}
+		pushChordEntries(entries, preChords);
 
 		const lineChords: ChordEvent[] = [];
 		while (chordCursor < chords.length && chords[chordCursor].t <= chordEnd) {
@@ -132,9 +167,7 @@ export function buildEntries(
 		postChords.push(chords[chordCursor]);
 		chordCursor++;
 	}
-	if (postChords.length > 0) {
-		entries.push({ kind: "chords", chords: postChords, t: postChords[0].t });
-	}
+	pushChordEntries(entries, postChords);
 
 	return entries;
 }
@@ -153,6 +186,18 @@ export function buildMeasures(beats: BeatEvent[], start: number, end: number): M
 				chords: [],
 			});
 		}
+	}
+
+	// Pickup measure: if chords exist before the first downbeat, create a partial measure
+	// so those chords have somewhere to render.
+	if (measures.length > 0 && measures[0].t > start) {
+		measures.unshift({ t: start, end: measures[0].t, chords: [] });
+	}
+
+	// No downbeats in range: create a single measure spanning the full range
+	// so chords aren't silently dropped.
+	if (measures.length === 0 && start < end) {
+		measures.push({ t: start, end, chords: [] });
 	}
 
 	return measures;

@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
 	buildEntries,
 	buildMeasures,
 	type DisplayEntry,
-	findChordForWord,
 	formatSectionLabel,
 	groupBySection,
 	type Measure,
@@ -141,12 +140,87 @@ function ChordWordLine({
 	const hasChords = entry.chords.length > 0;
 	const hasWords = entry.words.length > 0;
 
+	const chordRowRef = useRef<HTMLDivElement>(null);
+	const wordSpanRefs = useRef<(HTMLSpanElement | null)[]>([]);
+
+	// Position each chord above its nearest word, then push right to prevent overlap.
+	useLayoutEffect(() => {
+		const row = chordRowRef.current;
+		if (!row || !hasChords || !hasWords) return;
+
+		const labels = Array.from(row.children) as HTMLSpanElement[];
+		if (labels.length === 0) return;
+
+		const containerLeft = row.getBoundingClientRect().left;
+		const wordEls = wordSpanRefs.current;
+
+		// Measure word positions once
+		const wordLefts: number[] = [];
+		for (let w = 0; w < entry.words.length; w++) {
+			const el = wordEls[w];
+			wordLefts.push(el ? el.getBoundingClientRect().left - containerLeft : 0);
+		}
+
+		// For each chord, find the anchor position (nearest word by timestamp)
+		const anchors: number[] = [];
+		for (const chord of entry.chords) {
+			let bestIdx = 0;
+			let bestDist = Math.abs(chord.t - entry.words[0].t);
+			for (let w = 1; w < entry.words.length; w++) {
+				const dist = Math.abs(chord.t - entry.words[w].t);
+				if (dist < bestDist) {
+					bestDist = dist;
+					bestIdx = w;
+				}
+			}
+			anchors.push(wordLefts[bestIdx]);
+		}
+
+		// Sweep left-to-right: place each chord at its anchor, push right if overlapping
+		const MIN_GAP = 6;
+		let prevRight = -Infinity;
+
+		for (let i = 0; i < labels.length; i++) {
+			let left = anchors[i];
+			if (left < prevRight + MIN_GAP) {
+				left = prevRight + MIN_GAP;
+			}
+			labels[i].style.left = `${left}px`;
+			prevRight = left + labels[i].offsetWidth;
+		}
+	});
+
 	if (!hasWords) {
 		return (
-			<div ref={lineRef} style={{ paddingTop: hasChords ? 22 : 0 }}>
+			<div ref={lineRef}>
 				{hasChords && (
-					<div style={{ fontSize: 14, color: "#e8b84b", fontWeight: 600, marginBottom: 2 }}>
-						{entry.chords.map((c) => c.chord).join("  ")}
+					<div
+						ref={chordRowRef}
+						style={{
+							position: "relative",
+							height: 20,
+							fontSize: 14,
+							fontWeight: 600,
+							color: "#e8b84b",
+							marginBottom: 2,
+						}}
+					>
+						{entry.chords.map((c) => (
+							<span
+								key={c.t}
+								onClick={(e) => {
+									e.stopPropagation();
+									onSeek(c.t);
+								}}
+								style={{
+									position: "absolute",
+									whiteSpace: "nowrap",
+									cursor: "pointer",
+								}}
+							>
+								{c.chord}
+							</span>
+						))}
 					</div>
 				)}
 				<button
@@ -174,8 +248,6 @@ function ChordWordLine({
 		);
 	}
 
-	const usedChords = new Set<ChordEvent>();
-
 	return (
 		<div
 			ref={lineRef}
@@ -185,8 +257,6 @@ function ChordWordLine({
 			tabIndex={0}
 			style={{
 				padding: "4px 0",
-				paddingTop: hasChords ? 22 : 4,
-				position: "relative",
 				cursor: "pointer",
 				fontSize: 20,
 				lineHeight: 1.6,
@@ -194,46 +264,56 @@ function ChordWordLine({
 				border: "none",
 			}}
 		>
+			{hasChords && (
+				<div
+					ref={chordRowRef}
+					style={{
+						position: "relative",
+						height: 20,
+						fontSize: 14,
+						fontWeight: 600,
+						color: "#e8b84b",
+						marginBottom: 2,
+					}}
+				>
+					{entry.chords.map((c) => (
+						<span
+							key={c.t}
+							onClick={(e) => {
+								e.stopPropagation();
+								onSeek(c.t);
+							}}
+							style={{
+								position: "absolute",
+								whiteSpace: "nowrap",
+								cursor: "pointer",
+							}}
+						>
+							{c.chord}
+						</span>
+					))}
+				</div>
+			)}
 			{entry.words.map((word, wordIdx) => {
-				const chord = findChordForWord(word, entry.chords);
 				const isActiveWord = isActiveLine && word.t === activeWordT;
-				const showChord = chord && !usedChords.has(chord);
-				if (chord) usedChords.add(chord);
-
 				const isLastWord = wordIdx === entry.words.length - 1;
-
 				return (
 					<span
 						key={`w-${entry.line.t}-${wordIdx}`}
+						ref={(el) => {
+							wordSpanRefs.current[wordIdx] = el;
+						}}
 						onClick={(e) => {
 							e.stopPropagation();
 							onSeek(word.t);
 						}}
 						style={{
-							position: "relative",
-							display: "inline",
 							cursor: "pointer",
 							color: isActiveWord ? "#fff" : isActiveLine ? "#ccc" : "#999",
 							fontWeight: isActiveWord ? 700 : isActiveLine ? 500 : 400,
 							transition: "color 0.1s, font-weight 0.1s",
 						}}
 					>
-						{showChord && (
-							<span
-								style={{
-									position: "absolute",
-									top: -20,
-									left: 0,
-									fontSize: 14,
-									fontWeight: 600,
-									color: "#e8b84b",
-									whiteSpace: "nowrap",
-									pointerEvents: "none",
-								}}
-							>
-								{chord.chord}
-							</span>
-						)}
 						{word.text}
 						{!isLastWord && " "}
 					</span>
@@ -394,7 +474,7 @@ export function LyricsChordDisplay({
 		container.scrollTo({ top: clampedScroll, behavior: "smooth" });
 	}, [activeLineT]);
 
-	const entries = buildEntries(lyrics, words, chords);
+	const entries = buildEntries(lyrics, words, chords, beats);
 	const groups = groupBySection(entries, sections);
 
 	if (!lyrics.length && !chords.length) {
