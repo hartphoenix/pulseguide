@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { formatChord } from "../display/format-chord";
 import {
 	buildEntries,
 	buildMeasures,
@@ -15,7 +16,8 @@ import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../ty
 const SCROLL_TARGET_RATIO = 0.15;
 
 const WORD_FONT = "20px system-ui, -apple-system, sans-serif";
-const CHORD_FONT = "600 14px system-ui, -apple-system, sans-serif";
+const CHORD_FONT_FAMILY = '"Leland Text", system-ui, -apple-system, sans-serif';
+const CHORD_FONT = `600 14px ${CHORD_FONT_FAMILY}`;
 const CHORD_GAP = 6;
 
 function ChordRow({
@@ -33,6 +35,7 @@ function ChordRow({
 				padding: "6px 0",
 				fontSize: 15,
 				fontWeight: 600,
+				fontFamily: CHORD_FONT_FAMILY,
 				color: "#e8b84b",
 				cursor: "pointer",
 				display: "flex",
@@ -51,7 +54,7 @@ function ChordRow({
 							transition: "opacity 0.15s",
 						}}
 					>
-						{c.chord}
+						{formatChord(c.chord)}
 					</span>
 				);
 			})}
@@ -81,7 +84,7 @@ function MeasureChart({
 			{rows.map((row) => (
 				<div
 					key={row[0].t}
-					style={{ display: "flex", fontFamily: "inherit", fontSize: 16, lineHeight: 1.8 }}
+					style={{ display: "flex", fontFamily: CHORD_FONT_FAMILY, fontSize: 16, lineHeight: 1.8 }}
 				>
 					{row.map((measure, idx) => {
 						const measureActive = position >= measure.t && position < measure.end;
@@ -110,7 +113,7 @@ function MeasureChart({
 													marginRight: 8,
 												}}
 											>
-												{c.chord}
+												{formatChord(c.chord)}
 											</span>
 										);
 									})
@@ -158,7 +161,7 @@ function computeChordPositions(
 			left = prevRight + CHORD_GAP;
 		}
 		positions.push(left);
-		prevRight = left + measureTextWidth(chord.chord, CHORD_FONT);
+		prevRight = left + measureTextWidth(formatChord(chord.chord), CHORD_FONT);
 	}
 
 	return positions;
@@ -197,6 +200,7 @@ function ChordWordLine({
 							gap: "0 10px",
 							fontSize: 14,
 							fontWeight: 600,
+							fontFamily: CHORD_FONT_FAMILY,
 							color: "#e8b84b",
 							marginBottom: 2,
 						}}
@@ -210,7 +214,7 @@ function ChordWordLine({
 								}}
 								style={{ cursor: "pointer", whiteSpace: "nowrap" }}
 							>
-								{c.chord}
+								{formatChord(c.chord)}
 							</span>
 						))}
 					</div>
@@ -263,6 +267,7 @@ function ChordWordLine({
 						height: 20,
 						fontSize: 14,
 						fontWeight: 600,
+						fontFamily: CHORD_FONT_FAMILY,
 						color: "#e8b84b",
 						marginBottom: 2,
 					}}
@@ -281,7 +286,7 @@ function ChordWordLine({
 								cursor: "pointer",
 							}}
 						>
-							{c.chord}
+							{formatChord(c.chord)}
 						</span>
 					))}
 				</div>
