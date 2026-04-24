@@ -51,6 +51,7 @@ export function alignWordsToLine(
 	lineT: number,
 	words: WordEvent[],
 	usedIndices: Set<number>,
+	maxDist = Number.POSITIVE_INFINITY,
 ): WordEvent[] {
 	const lineTextWords = lineText.split(/\s+/).filter(Boolean);
 	const n = lineTextWords.length;
@@ -60,6 +61,9 @@ export function alignWordsToLine(
 	let bestDist = Number.POSITIVE_INFINITY;
 
 	for (let start = 0; start <= words.length - n; start++) {
+		const dist = Math.abs(words[start].t - lineT);
+		if (dist > maxDist) continue;
+
 		let anyUsed = false;
 		for (let j = start; j < start + n; j++) {
 			if (usedIndices.has(j)) {
@@ -74,7 +78,6 @@ export function alignWordsToLine(
 		);
 		if (!matches) continue;
 
-		const dist = Math.abs(words[start].t - lineT);
 		if (dist < bestDist) {
 			bestDist = dist;
 			bestStart = start;
@@ -88,6 +91,18 @@ export function alignWordsToLine(
 		usedIndices.add(j);
 	}
 	return result;
+}
+
+// Duration of one bar near `t`, measured between the two nearest downbeats.
+function barDurationNear(t: number, beats: BeatEvent[]): number | null {
+	let prev: number | null = null;
+	for (const beat of beats) {
+		if (beat.downbeat) {
+			if (beat.t > t && prev !== null) return beat.t - prev;
+			prev = beat.t;
+		}
+	}
+	return null;
 }
 
 // Find the timestamp one full bar after `t`: the second downbeat past `t`.
@@ -131,9 +146,11 @@ export function buildEntries(
 	const entries: DisplayEntry[] = [];
 	let chordCursor = 0;
 
+	const matchWindow = barDurationNear(0, beats) ?? LINE_CHORD_FALLBACK;
+
 	for (let i = 0; i < lyrics.length; i++) {
 		const line = lyrics[i];
-		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices);
+		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices, matchWindow);
 
 		const chordStart = line.t - CHORD_WORD_TOLERANCE;
 		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
 	buildEntries,
 	buildMeasures,
@@ -8,10 +8,15 @@ import {
 	type Measure,
 	type SectionGroup,
 } from "../display/layout";
+import { measureTextWidth, wordOffsets } from "../display/measure-text";
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
 
 // Active line sits at 15% from top of scroll container (Hart specified 10-20%).
 const SCROLL_TARGET_RATIO = 0.15;
+
+const WORD_FONT = "20px system-ui, -apple-system, sans-serif";
+const CHORD_FONT = "600 14px system-ui, -apple-system, sans-serif";
+const CHORD_GAP = 6;
 
 function ChordRow({
 	chords,
@@ -123,6 +128,42 @@ function MeasureChart({
 	);
 }
 
+function computeChordPositions(
+	chords: ChordEvent[],
+	words: { t: number; text: string }[],
+): number[] {
+	if (chords.length === 0 || words.length === 0) return [];
+
+	const offsets = wordOffsets(
+		words.map((w) => w.text),
+		WORD_FONT,
+	);
+
+	const positions: number[] = [];
+	let prevRight = -Infinity;
+
+	for (const chord of chords) {
+		let bestIdx = 0;
+		let bestDist = Math.abs(chord.t - words[0].t);
+		for (let w = 1; w < words.length; w++) {
+			const dist = Math.abs(chord.t - words[w].t);
+			if (dist < bestDist) {
+				bestDist = dist;
+				bestIdx = w;
+			}
+		}
+
+		let left = offsets[bestIdx];
+		if (left < prevRight + CHORD_GAP) {
+			left = prevRight + CHORD_GAP;
+		}
+		positions.push(left);
+		prevRight = left + measureTextWidth(chord.chord, CHORD_FONT);
+	}
+
+	return positions;
+}
+
 function ChordWordLine({
 	entry,
 	activeLineT,
@@ -140,65 +181,20 @@ function ChordWordLine({
 	const hasChords = entry.chords.length > 0;
 	const hasWords = entry.words.length > 0;
 
-	const chordRowRef = useRef<HTMLDivElement>(null);
-	const wordSpanRefs = useRef<(HTMLSpanElement | null)[]>([]);
-
-	// Position each chord above its nearest word, then push right to prevent overlap.
-	useLayoutEffect(() => {
-		const row = chordRowRef.current;
-		if (!row || !hasChords || !hasWords) return;
-
-		const labels = Array.from(row.children) as HTMLSpanElement[];
-		if (labels.length === 0) return;
-
-		const containerLeft = row.getBoundingClientRect().left;
-		const wordEls = wordSpanRefs.current;
-
-		// Measure word positions once
-		const wordLefts: number[] = [];
-		for (let w = 0; w < entry.words.length; w++) {
-			const el = wordEls[w];
-			wordLefts.push(el ? el.getBoundingClientRect().left - containerLeft : 0);
-		}
-
-		// For each chord, find the anchor position (nearest word by timestamp)
-		const anchors: number[] = [];
-		for (const chord of entry.chords) {
-			let bestIdx = 0;
-			let bestDist = Math.abs(chord.t - entry.words[0].t);
-			for (let w = 1; w < entry.words.length; w++) {
-				const dist = Math.abs(chord.t - entry.words[w].t);
-				if (dist < bestDist) {
-					bestDist = dist;
-					bestIdx = w;
-				}
-			}
-			anchors.push(wordLefts[bestIdx]);
-		}
-
-		// Sweep left-to-right: place each chord at its anchor, push right if overlapping
-		const MIN_GAP = 6;
-		let prevRight = -Infinity;
-
-		for (let i = 0; i < labels.length; i++) {
-			let left = anchors[i];
-			if (left < prevRight + MIN_GAP) {
-				left = prevRight + MIN_GAP;
-			}
-			labels[i].style.left = `${left}px`;
-			prevRight = left + labels[i].offsetWidth;
-		}
-	});
+	const chordPositions = useMemo(
+		() => (hasWords ? computeChordPositions(entry.chords, entry.words) : []),
+		[entry.chords, entry.words, hasWords],
+	);
 
 	if (!hasWords) {
 		return (
 			<div ref={lineRef}>
 				{hasChords && (
 					<div
-						ref={chordRowRef}
 						style={{
-							position: "relative",
-							height: 20,
+							display: "flex",
+							flexWrap: "wrap",
+							gap: "0 10px",
 							fontSize: 14,
 							fontWeight: 600,
 							color: "#e8b84b",
@@ -212,11 +208,7 @@ function ChordWordLine({
 									e.stopPropagation();
 									onSeek(c.t);
 								}}
-								style={{
-									position: "absolute",
-									whiteSpace: "nowrap",
-									cursor: "pointer",
-								}}
+								style={{ cursor: "pointer", whiteSpace: "nowrap" }}
 							>
 								{c.chord}
 							</span>
@@ -266,7 +258,6 @@ function ChordWordLine({
 		>
 			{hasChords && (
 				<div
-					ref={chordRowRef}
 					style={{
 						position: "relative",
 						height: 20,
@@ -276,7 +267,7 @@ function ChordWordLine({
 						marginBottom: 2,
 					}}
 				>
-					{entry.chords.map((c) => (
+					{entry.chords.map((c, i) => (
 						<span
 							key={c.t}
 							onClick={(e) => {
@@ -285,6 +276,7 @@ function ChordWordLine({
 							}}
 							style={{
 								position: "absolute",
+								left: chordPositions[i],
 								whiteSpace: "nowrap",
 								cursor: "pointer",
 							}}
@@ -300,9 +292,6 @@ function ChordWordLine({
 				return (
 					<span
 						key={`w-${entry.line.t}-${wordIdx}`}
-						ref={(el) => {
-							wordSpanRefs.current[wordIdx] = el;
-						}}
 						onClick={(e) => {
 							e.stopPropagation();
 							onSeek(word.t);
