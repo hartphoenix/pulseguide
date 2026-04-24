@@ -84,7 +84,9 @@ function buildEntries(
 		const chordStart = line.t - CHORD_WORD_TOLERANCE;
 		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;
 		const chordEnd = Math.min(
-			lineWords.length > 0 ? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE : line.t + CHORD_WORD_TOLERANCE,
+			lineWords.length > 0
+				? lineWords[lineWords.length - 1].t + CHORD_WORD_TOLERANCE
+				: line.t + CHORD_WORD_TOLERANCE,
 			nextLineT,
 		);
 
@@ -137,10 +139,7 @@ function buildMeasures(beats: BeatEvent[], start: number, end: number): Measure[
 	return measures;
 }
 
-function groupBySection(
-	entries: DisplayEntry[],
-	sections: Section[],
-): SectionGroup[] {
+function groupBySection(entries: DisplayEntry[], sections: Section[]): SectionGroup[] {
 	if (!sections.length) {
 		return [{ section: { t: 0, type: "", end: Number.POSITIVE_INFINITY }, entries }];
 	}
@@ -253,30 +252,30 @@ function MeasureChart({
 									cursor: "pointer",
 									borderLeft: "1px solid #333",
 									borderRight: idx === row.length - 1 ? "1px solid #333" : "none",
-									}}
+								}}
 							>
-								{measure.chords.length > 0
-									? measure.chords.map((c) => {
-											const chordActive = position >= c.t && position < (c.end ?? measure.end);
-											return (
-												<span
-													key={c.t}
-													style={{
-														color: chordActive ? "#e8b84b" : "#777",
-														fontWeight: chordActive ? 600 : 400,
-														transition: "color 0.1s",
-														marginRight: 8,
-													}}
-												>
-													{c.chord}
-												</span>
-											);
-										})
-									: (
-										<span style={{ color: measureActive ? "#555" : "#333" }}>
-											{"/ ".repeat(3).trim()}
-										</span>
-									)}
+								{measure.chords.length > 0 ? (
+									measure.chords.map((c) => {
+										const chordActive = position >= c.t && position < (c.end ?? measure.end);
+										return (
+											<span
+												key={c.t}
+												style={{
+													color: chordActive ? "#e8b84b" : "#777",
+													fontWeight: chordActive ? 600 : 400,
+													transition: "color 0.1s",
+													marginRight: 8,
+												}}
+											>
+												{c.chord}
+											</span>
+										);
+									})
+								) : (
+									<span style={{ color: measureActive ? "#555" : "#333" }}>
+										{"/ ".repeat(3).trim()}
+									</span>
+								)}
 							</div>
 						);
 					})}
@@ -414,16 +413,21 @@ function renderChordEntry(
 	beats: BeatEvent[],
 ) {
 	if (entry.chords.length <= MEASURE_CHART_THRESHOLD) {
-		return <ChordRow key={`cr-${entry.t}`} chords={entry.chords} position={position} onSeek={onSeek} />;
+		return (
+			<ChordRow key={`cr-${entry.t}`} chords={entry.chords} position={position} onSeek={onSeek} />
+		);
 	}
 	const start = entry.chords[0].t;
-	const end = entry.chords[entry.chords.length - 1].end ?? entry.chords[entry.chords.length - 1].t + 5000;
+	const end =
+		entry.chords[entry.chords.length - 1].end ?? entry.chords[entry.chords.length - 1].t + 5000;
 	const measures = buildMeasures(beats, start, end);
 	for (const chord of entry.chords) {
 		const measure = measures.find((m) => chord.t >= m.t && chord.t < m.end);
 		if (measure) measure.chords.push(chord);
 	}
-	return <MeasureChart key={`mc-${entry.t}`} measures={measures} position={position} onSeek={onSeek} />;
+	return (
+		<MeasureChart key={`mc-${entry.t}`} measures={measures} position={position} onSeek={onSeek} />
+	);
 }
 
 function SectionBlock({
