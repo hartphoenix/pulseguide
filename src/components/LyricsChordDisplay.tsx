@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatChord } from "../display/format-chord";
 import {
 	buildEntries,
@@ -47,6 +47,7 @@ function ChordRow({
 				return (
 					<span
 						key={c.t}
+						data-chord-t={c.t}
 						onClick={() => onSeek(c.t)}
 						style={{
 							marginRight: 16,
@@ -106,6 +107,7 @@ function MeasureChart({
 										return (
 											<span
 												key={c.t}
+												data-chord-t={c.t}
 												style={{
 													color: chordActive ? "#e8b84b" : "#777",
 													fontWeight: chordActive ? 600 : 400,
@@ -208,6 +210,7 @@ function ChordWordLine({
 						{entry.chords.map((c) => (
 							<span
 								key={c.t}
+								data-chord-t={c.t}
 								onClick={(e) => {
 									e.stopPropagation();
 									onSeek(c.t);
@@ -275,6 +278,7 @@ function ChordWordLine({
 					{entry.chords.map((c, i) => (
 						<span
 							key={c.t}
+							data-chord-t={c.t}
 							onClick={(e) => {
 								e.stopPropagation();
 								onSeek(c.t);
@@ -432,6 +436,7 @@ export function LyricsChordDisplay({
 	beats,
 	activeLineT,
 	activeWordT,
+	activeChordT,
 	activeSection,
 	position,
 	onSeek,
@@ -443,30 +448,67 @@ export function LyricsChordDisplay({
 	beats: BeatEvent[];
 	activeLineT: number | null;
 	activeWordT: number | null;
+	activeChordT: number | null;
 	activeSection: Section | null;
 	position: number;
 	onSeek: (ms: number) => void;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const activeRef = useRef<HTMLDivElement>(null);
+	const [followMode, setFollowMode] = useState(true);
+	const programmaticScroll = useRef(false);
 
-	useEffect(() => {
-		if (!activeRef.current || !containerRef.current) return;
-
+	const scrollToElement = useCallback((el: Element) => {
 		const container = containerRef.current;
-		const active = activeRef.current;
+		if (!container) return;
 		const containerRect = container.getBoundingClientRect();
-		const activeRect = active.getBoundingClientRect();
-
+		const elRect = el.getBoundingClientRect();
 		const targetOffset = containerRect.height * SCROLL_TARGET_RATIO;
-		const activeRelativeTop = activeRect.top - containerRect.top + container.scrollTop;
+		const activeRelativeTop = elRect.top - containerRect.top + container.scrollTop;
 		const targetScroll = activeRelativeTop - targetOffset;
-
 		const maxScroll = container.scrollHeight - container.clientHeight;
 		const clampedScroll = Math.max(0, Math.min(targetScroll, maxScroll));
-
+		programmaticScroll.current = true;
 		container.scrollTo({ top: clampedScroll, behavior: "smooth" });
-	}, [activeLineT]);
+	}, []);
+
+	const scrollToActive = useCallback(() => {
+		if (activeRef.current) scrollToElement(activeRef.current);
+	}, [scrollToElement]);
+
+	useEffect(() => {
+		if (!followMode) return;
+		scrollToActive();
+	}, [activeLineT, followMode, scrollToActive]);
+
+	useEffect(() => {
+		if (!followMode || activeChordT === null) return;
+		const container = containerRef.current;
+		if (!container) return;
+		const el = container.querySelector(`[data-chord-t="${activeChordT}"]`);
+		if (el) scrollToElement(el);
+	}, [activeChordT, followMode, scrollToElement]);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+		let scrollTimer: ReturnType<typeof setTimeout>;
+		function onScroll() {
+			if (programmaticScroll.current) {
+				clearTimeout(scrollTimer);
+				scrollTimer = setTimeout(() => {
+					programmaticScroll.current = false;
+				}, 150);
+				return;
+			}
+			setFollowMode(false);
+		}
+		container.addEventListener("scroll", onScroll, { passive: true });
+		return () => {
+			container.removeEventListener("scroll", onScroll);
+			clearTimeout(scrollTimer);
+		};
+	}, []);
 
 	const entries = buildEntries(lyrics, words, chords, beats);
 	const groups = groupBySection(entries, sections);
@@ -476,30 +518,59 @@ export function LyricsChordDisplay({
 	}
 
 	return (
-		<div
-			ref={containerRef}
-			style={{
-				flex: 1,
-				overflow: "auto",
-				padding: "24px 12px",
-				WebkitOverflowScrolling: "touch",
-			}}
-		>
-			<div style={{ maxWidth: 720, margin: "0 auto" }}>
-				{groups.map((group) => (
-					<SectionBlock
-						key={group.section.t}
-						group={group}
-						activeLineT={activeLineT}
-						activeWordT={activeWordT}
-						activeSection={activeSection}
-						position={position}
-						beats={beats}
-						onSeek={onSeek}
-						activeRef={activeRef}
-					/>
-				))}
+		<div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+			<div
+				ref={containerRef}
+				style={{
+					height: "100%",
+					overflow: "auto",
+					padding: "24px 12px",
+					WebkitOverflowScrolling: "touch",
+				}}
+			>
+				<div style={{ maxWidth: 720, margin: "0 auto" }}>
+					{groups.map((group) => (
+						<SectionBlock
+							key={group.section.t}
+							group={group}
+							activeLineT={activeLineT}
+							activeWordT={activeWordT}
+							activeSection={activeSection}
+							position={position}
+							beats={beats}
+							onSeek={onSeek}
+							activeRef={activeRef}
+						/>
+					))}
+				</div>
 			</div>
+			{!followMode && (
+				<button
+					type="button"
+					onClick={() => {
+						setFollowMode(true);
+						scrollToActive();
+					}}
+					style={{
+						position: "absolute",
+						bottom: 24,
+						left: "50%",
+						transform: "translateX(-50%)",
+						padding: "8px 20px",
+						fontSize: 14,
+						background: "rgba(30, 30, 30, 0.85)",
+						color: "#ccc",
+						border: "1px solid #444",
+						borderRadius: 20,
+						cursor: "pointer",
+						backdropFilter: "blur(8px)",
+						WebkitBackdropFilter: "blur(8px)",
+						zIndex: 10,
+					}}
+				>
+					Follow playback
+				</button>
+			)}
 		</div>
 	);
 }

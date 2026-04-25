@@ -229,6 +229,7 @@ export function Player() {
 						beats={map.beats ?? []}
 						activeLineT={syncState?.currentLyric?.t ?? null}
 						activeWordT={syncState?.currentWord?.t ?? null}
+						activeChordT={syncState?.currentChord?.t ?? null}
 						activeSection={syncState?.currentSection ?? null}
 						position={syncState?.position ?? 0}
 						onSeek={handleSeek}
