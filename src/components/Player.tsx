@@ -5,6 +5,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import type { SyncState } from "../sync/engine";
 import { SyncEngine } from "../sync/engine";
 import type { PulseMap } from "../types/pulsemap";
+import { openEditor } from "../utils/editor";
 import { DebugPanel } from "./DebugPanel";
 import { LyricsChordDisplay } from "./LyricsChordDisplay";
 import { PlaybackControls } from "./PlaybackControls";
@@ -177,11 +178,35 @@ export function Player() {
 								{map.metadata.artist && ` — ${map.metadata.artist}`}
 							</span>
 						)}
+						{map && (
+							<button
+								type="button"
+								onClick={() =>
+									openEditor({
+										mapId: map.id,
+										t: syncState?.position ?? 0,
+										source: "pulseguide",
+									})
+								}
+								style={{
+									marginLeft: "auto",
+									padding: "2px 8px",
+									fontSize: 12,
+									background: "#222",
+									color: "#aaa",
+									border: "1px solid #444",
+									borderRadius: 4,
+									cursor: "pointer",
+								}}
+							>
+								Correct this map
+							</button>
+						)}
 						<button
 							type="button"
 							onClick={() => setShowDebug((s) => !s)}
 							style={{
-								marginLeft: "auto",
+								marginLeft: map ? 0 : "auto",
 								padding: "2px 8px",
 								fontSize: 12,
 								background: "#222",
@@ -233,6 +258,7 @@ export function Player() {
 						activeSection={syncState?.currentSection ?? null}
 						position={syncState?.position ?? 0}
 						onSeek={handleSeek}
+						mapId={map.id}
 					/>
 				) : (
 					<div

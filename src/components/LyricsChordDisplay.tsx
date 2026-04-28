@@ -11,6 +11,7 @@ import {
 } from "../display/layout";
 import { measureTextWidth, wordOffsets } from "../display/measure-text";
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
+import { openEditor } from "../utils/editor";
 
 // Active line sits at 15% from top of scroll container (Hart specified 10-20%).
 const SCROLL_TARGET_RATIO = 0.15;
@@ -24,10 +25,14 @@ function ChordRow({
 	chords,
 	position,
 	onSeek,
+	mapId,
+	allChords,
 }: {
 	chords: ChordEvent[];
 	position: number;
 	onSeek: (ms: number) => void;
+	mapId: string;
+	allChords: ChordEvent[];
 }) {
 	return (
 		<div
@@ -49,6 +54,17 @@ function ChordRow({
 						key={c.t}
 						data-chord-t={c.t}
 						onClick={() => onSeek(c.t)}
+						onContextMenu={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							openEditor({
+								mapId,
+								t: c.t,
+								lane: "chords",
+								index: allChords.findIndex((x) => x.t === c.t),
+								source: "pulseguide",
+							});
+						}}
 						style={{
 							marginRight: 16,
 							opacity: isActive ? 1 : 0.7,
@@ -67,10 +83,14 @@ function MeasureChart({
 	measures,
 	position,
 	onSeek,
+	mapId,
+	allChords,
 }: {
 	measures: Measure[];
 	position: number;
 	onSeek: (ms: number) => void;
+	mapId: string;
+	allChords: ChordEvent[];
 }) {
 	if (!measures.length) return null;
 
@@ -108,6 +128,17 @@ function MeasureChart({
 											<span
 												key={c.t}
 												data-chord-t={c.t}
+												onContextMenu={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													openEditor({
+														mapId,
+														t: c.t,
+														lane: "chords",
+														index: allChords.findIndex((x) => x.t === c.t),
+														source: "pulseguide",
+													});
+												}}
 												style={{
 													color: chordActive ? "#e8b84b" : "#777",
 													fontWeight: chordActive ? 600 : 400,
@@ -175,12 +206,20 @@ function ChordWordLine({
 	activeWordT,
 	onSeek,
 	lineRef,
+	mapId,
+	allChords,
+	allWords,
+	allLyrics,
 }: {
 	entry: Extract<DisplayEntry, { kind: "lyric" }>;
 	activeLineT: number | null;
 	activeWordT: number | null;
 	onSeek: (ms: number) => void;
 	lineRef: React.Ref<HTMLDivElement> | undefined;
+	mapId: string;
+	allChords: ChordEvent[];
+	allWords: WordEvent[];
+	allLyrics: LyricLine[];
 }) {
 	const isActiveLine = entry.line.t === activeLineT;
 	const hasChords = entry.chords.length > 0;
@@ -215,6 +254,17 @@ function ChordWordLine({
 									e.stopPropagation();
 									onSeek(c.t);
 								}}
+								onContextMenu={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									openEditor({
+										mapId,
+										t: c.t,
+										lane: "chords",
+										index: allChords.findIndex((x) => x.t === c.t),
+										source: "pulseguide",
+									});
+								}}
 								style={{ cursor: "pointer", whiteSpace: "nowrap" }}
 							>
 								{formatChord(c.chord)}
@@ -225,6 +275,17 @@ function ChordWordLine({
 				<button
 					type="button"
 					onClick={() => onSeek(entry.line.t)}
+					onContextMenu={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						openEditor({
+							mapId,
+							t: entry.line.t,
+							lane: "lyrics",
+							index: allLyrics.findIndex((x) => x.t === entry.line.t),
+							source: "pulseguide",
+						});
+					}}
 					style={{
 						display: "block",
 						width: "100%",
@@ -252,6 +313,17 @@ function ChordWordLine({
 			ref={lineRef}
 			onClick={() => onSeek(entry.line.t)}
 			onKeyDown={(e) => e.key === "Enter" && onSeek(entry.line.t)}
+			onContextMenu={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				openEditor({
+					mapId,
+					t: entry.line.t,
+					lane: "lyrics",
+					index: allLyrics.findIndex((x) => x.t === entry.line.t),
+					source: "pulseguide",
+				});
+			}}
 			role="button"
 			tabIndex={0}
 			style={{
@@ -283,6 +355,17 @@ function ChordWordLine({
 								e.stopPropagation();
 								onSeek(c.t);
 							}}
+							onContextMenu={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								openEditor({
+									mapId,
+									t: c.t,
+									lane: "chords",
+									index: allChords.findIndex((x) => x.t === c.t),
+									source: "pulseguide",
+								});
+							}}
 							style={{
 								position: "absolute",
 								left: chordPositions[i],
@@ -304,6 +387,17 @@ function ChordWordLine({
 						onClick={(e) => {
 							e.stopPropagation();
 							onSeek(word.t);
+						}}
+						onContextMenu={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							openEditor({
+								mapId,
+								t: word.t,
+								lane: "words",
+								index: allWords.findIndex((x) => x.t === word.t),
+								source: "pulseguide",
+							});
 						}}
 						style={{
 							cursor: "pointer",
@@ -330,10 +424,19 @@ function renderChordEntry(
 	position: number,
 	onSeek: (ms: number) => void,
 	beats: BeatEvent[],
+	mapId: string,
+	allChords: ChordEvent[],
 ) {
 	if (entry.chords.length <= MEASURE_CHART_THRESHOLD) {
 		return (
-			<ChordRow key={`cr-${entry.t}`} chords={entry.chords} position={position} onSeek={onSeek} />
+			<ChordRow
+				key={`cr-${entry.t}`}
+				chords={entry.chords}
+				position={position}
+				onSeek={onSeek}
+				mapId={mapId}
+				allChords={allChords}
+			/>
 		);
 	}
 	const start = entry.chords[0].t;
@@ -345,7 +448,14 @@ function renderChordEntry(
 		if (measure) measure.chords.push(chord);
 	}
 	return (
-		<MeasureChart key={`mc-${entry.t}`} measures={measures} position={position} onSeek={onSeek} />
+		<MeasureChart
+			key={`mc-${entry.t}`}
+			measures={measures}
+			position={position}
+			onSeek={onSeek}
+			mapId={mapId}
+			allChords={allChords}
+		/>
 	);
 }
 
@@ -358,6 +468,11 @@ function SectionBlock({
 	beats,
 	onSeek,
 	activeRef,
+	mapId,
+	allChords,
+	allWords,
+	allLyrics,
+	allSections,
 }: {
 	group: SectionGroup;
 	activeLineT: number | null;
@@ -367,6 +482,11 @@ function SectionBlock({
 	beats: BeatEvent[];
 	onSeek: (ms: number) => void;
 	activeRef: React.RefObject<HTMLDivElement | null>;
+	mapId: string;
+	allChords: ChordEvent[];
+	allWords: WordEvent[];
+	allLyrics: LyricLine[];
+	allSections: Section[];
 }) {
 	const label = formatSectionLabel(group.section);
 	const isActiveSection = activeSection?.t === group.section.t;
@@ -381,6 +501,17 @@ function SectionBlock({
 			}}
 		>
 			<div
+				onContextMenu={(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					openEditor({
+						mapId,
+						t: group.section.t,
+						lane: "sections",
+						index: allSections.findIndex((x) => x.t === group.section.t),
+						source: "pulseguide",
+					});
+				}}
 				style={{
 					width: 80,
 					flexShrink: 0,
@@ -391,6 +522,7 @@ function SectionBlock({
 					transition: "color 0.2s",
 					textAlign: "right",
 					userSelect: "none",
+					cursor: "context-menu",
 				}}
 			>
 				{label}
@@ -398,7 +530,7 @@ function SectionBlock({
 			<div style={{ flex: 1, minWidth: 0 }}>
 				{group.entries.map((entry) => {
 					if (entry.kind === "chords") {
-						return renderChordEntry(entry, position, onSeek, beats);
+						return renderChordEntry(entry, position, onSeek, beats, mapId, allChords);
 					}
 					const isActive = entry.line.t === activeLineT;
 					return (
@@ -409,6 +541,10 @@ function SectionBlock({
 							activeWordT={activeWordT}
 							onSeek={onSeek}
 							lineRef={isActive ? activeRef : undefined}
+							mapId={mapId}
+							allChords={allChords}
+							allWords={allWords}
+							allLyrics={allLyrics}
 						/>
 					);
 				})}
@@ -440,6 +576,7 @@ export function LyricsChordDisplay({
 	activeSection,
 	position,
 	onSeek,
+	mapId,
 }: {
 	lyrics: LyricLine[];
 	words: WordEvent[];
@@ -452,6 +589,7 @@ export function LyricsChordDisplay({
 	activeSection: Section | null;
 	position: number;
 	onSeek: (ms: number) => void;
+	mapId: string;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const activeRef = useRef<HTMLDivElement>(null);
@@ -540,6 +678,11 @@ export function LyricsChordDisplay({
 							beats={beats}
 							onSeek={onSeek}
 							activeRef={activeRef}
+							mapId={mapId}
+							allChords={chords}
+							allWords={words}
+							allLyrics={lyrics}
+							allSections={sections}
 						/>
 					))}
 				</div>
