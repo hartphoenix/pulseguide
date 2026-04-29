@@ -38,81 +38,96 @@ export function RecordingsDrawer({
 	}, [open, onClose]);
 
 	return (
-		<aside
-			style={{
-				position: "absolute",
-				top: 0,
-				right: 0,
-				bottom: 0,
-				width: 320,
-				background: "#141414",
-				borderLeft: "1px solid #2a2a2a",
-				transform: open ? "translateX(0)" : "translateX(100%)",
-				transition: "transform 200ms ease",
-				display: "flex",
-				flexDirection: "column",
-				zIndex: 50,
-				boxShadow: open ? "-4px 0 12px rgba(0,0,0,0.4)" : "none",
-			}}
-		>
+		<>
 			<div
+				onClick={onClose}
+				aria-hidden="true"
 				style={{
-					padding: "8px 12px",
-					borderBottom: "1px solid #2a2a2a",
+					position: "absolute",
+					inset: 0,
+					background: "rgba(0, 0, 0, 0.45)",
+					opacity: open ? 1 : 0,
+					pointerEvents: open ? "auto" : "none",
+					transition: "opacity 200ms ease",
+					zIndex: 49,
+				}}
+			/>
+			<aside
+				style={{
+					position: "absolute",
+					top: 0,
+					right: 0,
+					bottom: 0,
+					width: 320,
+					background: "#141414",
+					borderLeft: "1px solid #2a2a2a",
+					transform: open ? "translateX(0)" : "translateX(100%)",
+					transition: "transform 200ms ease",
 					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: 8,
+					flexDirection: "column",
+					zIndex: 50,
+					boxShadow: open ? "-4px 0 12px rgba(0,0,0,0.4)" : "none",
 				}}
 			>
-				<span style={{ fontSize: 13, color: "#aaa" }}>Recordings</span>
-				<button
-					type="button"
-					onClick={onClose}
-					aria-label="Close recordings drawer"
+				<div
 					style={{
-						padding: "2px 8px",
-						fontSize: 12,
-						background: "transparent",
-						color: "#aaa",
-						border: "1px solid #444",
-						borderRadius: 4,
-						cursor: "pointer",
+						padding: "8px 12px",
+						borderBottom: "1px solid #2a2a2a",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: 8,
 					}}
 				>
-					Close
-				</button>
-			</div>
-
-			<div style={{ flex: 1, overflowY: "auto" }}>
-				{journeys.length === 0 ? (
-					<div
+					<span style={{ fontSize: 13, color: "#aaa" }}>Recordings</span>
+					<button
+						type="button"
+						onClick={onClose}
+						aria-label="Close recordings drawer"
 						style={{
-							padding: 16,
-							color: "#666",
-							fontSize: 13,
-							textAlign: "center",
+							padding: "2px 8px",
+							fontSize: 12,
+							background: "transparent",
+							color: "#aaa",
+							border: "1px solid #444",
+							borderRadius: 4,
+							cursor: "pointer",
 						}}
 					>
-						No recordings yet.
-					</div>
-				) : (
-					journeys.map((j) => (
-						<RecordingRow
-							key={j.id}
-							journey={j}
-							active={j.id === activeId}
-							recordingVolume={recordingVolume}
-							onSetRecordingVolume={onSetRecordingVolume}
-							onToggleActive={() => onToggleActive(j.id)}
-							onDelete={() => onDelete(j.id)}
-							onNudge={(d) => onNudge(j.id, d)}
-							onResetNudge={() => onResetNudge(j.id)}
-						/>
-					))
-				)}
-			</div>
-		</aside>
+						Close
+					</button>
+				</div>
+
+				<div style={{ flex: 1, overflowY: "auto" }}>
+					{journeys.length === 0 ? (
+						<div
+							style={{
+								padding: 16,
+								color: "#666",
+								fontSize: 13,
+								textAlign: "center",
+							}}
+						>
+							No recordings yet.
+						</div>
+					) : (
+						journeys.map((j) => (
+							<RecordingRow
+								key={j.id}
+								journey={j}
+								active={j.id === activeId}
+								recordingVolume={recordingVolume}
+								onSetRecordingVolume={onSetRecordingVolume}
+								onToggleActive={() => onToggleActive(j.id)}
+								onDelete={() => onDelete(j.id)}
+								onNudge={(d) => onNudge(j.id, d)}
+								onResetNudge={() => onResetNudge(j.id)}
+							/>
+						))
+					)}
+				</div>
+			</aside>
+		</>
 	);
 }
 
