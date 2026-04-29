@@ -35,8 +35,23 @@ export type RecordingSession = {
 	dispose: () => void;
 };
 
+// Music-recording defaults: disable VoIP processing (echo cancel,
+// noise suppression, AGC all degrade music capture and silently force
+// 16 kHz internal resampling), request 48 kHz mono, and bump Opus
+// bitrate well above Chrome's voice-call default (~48 kbps) into
+// transparent territory for music.
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+	echoCancellation: false,
+	noiseSuppression: false,
+	autoGainControl: false,
+	sampleRate: 48000,
+	channelCount: 1,
+};
+
+const RECORDER_BITRATE = 128_000;
+
 export async function startRecording(getMapPosition: () => number): Promise<RecordingSession> {
-	const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+	const stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
 
 	const audioContext = new AudioContext();
 	const source = audioContext.createMediaStreamSource(stream);
@@ -45,7 +60,11 @@ export async function startRecording(getMapPosition: () => number): Promise<Reco
 	source.connect(analyser);
 	const sampleBuf = new Uint8Array(analyser.fftSize);
 
-	const mediaRecorder = new MediaRecorder(stream);
+	const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: RECORDER_BITRATE };
+	if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+		recorderOptions.mimeType = "audio/webm;codecs=opus";
+	}
+	const mediaRecorder = new MediaRecorder(stream, recorderOptions);
 	const chunks: Blob[] = [];
 	mediaRecorder.ondataavailable = (e) => {
 		if (e.data && e.data.size > 0) chunks.push(e.data);
