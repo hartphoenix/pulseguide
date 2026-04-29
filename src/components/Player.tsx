@@ -170,14 +170,18 @@ export function Player() {
 		if (result.durationMs < MIN_RECORDING_MS) return null;
 
 		const journey: Journey = {
-			version: "0.1",
+			version: "0.2",
 			id: crypto.randomUUID(),
 			map_id: map.id,
 			type: "recording",
 			created_at: new Date().toISOString(),
 			start_offset_ms: info.startMs,
 			duration_ms: result.durationMs,
-			latency_compensation_ms: Math.round(info.latencyMs),
+			// outputLatency means the user heard music delayed by this much,
+			// so their voice was captured "late" relative to the map. Negate
+			// to shift recording earlier on playback (sign convention: +
+			// later, − earlier).
+			playback_offset_ms: -Math.round(info.latencyMs),
 			audio: { mime: result.mimeType },
 		};
 
@@ -210,7 +214,7 @@ export function Player() {
 	useEffect(() => {
 		const audio = audioElRef.current;
 		if (!audio || !activeJourney || !syncState) return;
-		const effectiveStart = activeJourney.start_offset_ms - activeJourney.latency_compensation_ms;
+		const effectiveStart = activeJourney.start_offset_ms + activeJourney.playback_offset_ms;
 		const inRange =
 			syncState.position >= effectiveStart &&
 			syncState.position < effectiveStart + activeJourney.duration_ms;
@@ -306,7 +310,7 @@ export function Player() {
 			});
 			audioElRef.current = audio;
 
-			const effectiveStart = journey.start_offset_ms - journey.latency_compensation_ms;
+			const effectiveStart = journey.start_offset_ms + journey.playback_offset_ms;
 			adapterRef.current.seek(Math.max(0, effectiveStart));
 			adapterRef.current.play();
 			setActiveJourneyId(id);
@@ -332,20 +336,20 @@ export function Player() {
 			if (!current) return;
 			const newVal = Math.max(
 				-NUDGE_CLAMP,
-				Math.min(NUDGE_CLAMP, current.latency_compensation_ms + deltaMs),
+				Math.min(NUDGE_CLAMP, current.playback_offset_ms + deltaMs),
 			);
-			const updated = { ...current, latency_compensation_ms: newVal };
+			const updated = { ...current, playback_offset_ms: newVal };
 			setJourneys((prev) => prev.map((j) => (j.id === id ? updated : j)));
 
 			if (activeJourneyId === id && audioElRef.current && adapterRef.current) {
-				const effectiveStart = updated.start_offset_ms - newVal;
+				const effectiveStart = updated.start_offset_ms + newVal;
 				const pos = adapterRef.current.getPosition();
 				audioElRef.current.currentTime = Math.max(0, (pos - effectiveStart) / 1000);
 			}
 
 			if (nudgeWriteTimer.current) clearTimeout(nudgeWriteTimer.current);
 			nudgeWriteTimer.current = setTimeout(() => {
-				updateJourney(id, { latency_compensation_ms: newVal });
+				updateJourney(id, { playback_offset_ms: newVal });
 			}, NUDGE_PERSIST_DEBOUNCE_MS);
 		},
 		[journeys, activeJourneyId],
@@ -355,7 +359,7 @@ export function Player() {
 		(id: string) => {
 			const current = journeys.find((j) => j.id === id);
 			if (!current) return;
-			const updated = { ...current, latency_compensation_ms: 0 };
+			const updated = { ...current, playback_offset_ms: 0 };
 			setJourneys((prev) => prev.map((j) => (j.id === id ? updated : j)));
 
 			if (activeJourneyId === id && audioElRef.current && adapterRef.current) {
@@ -365,7 +369,7 @@ export function Player() {
 			}
 
 			if (nudgeWriteTimer.current) clearTimeout(nudgeWriteTimer.current);
-			updateJourney(id, { latency_compensation_ms: 0 });
+			updateJourney(id, { playback_offset_ms: 0 });
 		},
 		[journeys, activeJourneyId],
 	);

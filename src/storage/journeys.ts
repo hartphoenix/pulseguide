@@ -43,6 +43,23 @@ function reqDone<T>(req: IDBRequest<T>): Promise<T> {
 	});
 }
 
+// v0.1 stored `latency_compensation_ms` with subtractive math
+// (effective_start = start - latency_comp). v0.2 renames to
+// `playback_offset_ms` with additive math and a flipped sign
+// convention (positive = later). Migrate on read.
+function migrateJourney(raw: unknown): Journey {
+	const r = raw as Record<string, unknown>;
+	if (r.version === "0.1" && typeof r.latency_compensation_ms === "number") {
+		const { latency_compensation_ms, ...rest } = r;
+		return {
+			...rest,
+			version: "0.2",
+			playback_offset_ms: -latency_compensation_ms,
+		} as Journey;
+	}
+	return raw as Journey;
+}
+
 export async function saveJourney(journey: Journey, blob: Blob): Promise<void> {
 	const db = await openDB();
 	const tx = db.transaction([JOURNEYS, BLOBS], "readwrite");
@@ -55,8 +72,24 @@ export async function listForMap(mapId: string): Promise<Journey[]> {
 	const db = await openDB();
 	const tx = db.transaction(JOURNEYS, "readonly");
 	const idx = tx.objectStore(JOURNEYS).index(MAP_ID_INDEX);
-	const journeys = await reqDone(idx.getAll(mapId));
+	const raw = await reqDone(idx.getAll(mapId));
 	await txDone(tx);
+
+	const journeys: Journey[] = [];
+	const needsRewrite: Journey[] = [];
+	for (const r of raw) {
+		const migrated = migrateJourney(r);
+		journeys.push(migrated);
+		if (migrated !== r) needsRewrite.push(migrated);
+	}
+
+	if (needsRewrite.length > 0) {
+		const tx2 = db.transaction(JOURNEYS, "readwrite");
+		const store = tx2.objectStore(JOURNEYS);
+		for (const j of needsRewrite) store.put(j);
+		await txDone(tx2);
+	}
+
 	return journeys.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 }
 
@@ -80,11 +113,12 @@ export async function updateJourney(id: string, patch: Partial<Journey>): Promis
 	const db = await openDB();
 	const tx = db.transaction(JOURNEYS, "readwrite");
 	const store = tx.objectStore(JOURNEYS);
-	const existing = (await reqDone(store.get(id))) as Journey | undefined;
-	if (!existing) {
+	const raw = await reqDone(store.get(id));
+	if (!raw) {
 		await txDone(tx);
 		return;
 	}
+	const existing = migrateJourney(raw);
 	store.put({ ...existing, ...patch, id });
 	await txDone(tx);
 }

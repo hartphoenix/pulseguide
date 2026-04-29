@@ -8,7 +8,7 @@
  * store, keyed by the same `id`.
  */
 export type Journey = {
-	version: "0.1";
+	version: "0.2";
 	id: string;
 	map_id: string;
 	type: "recording";
@@ -16,12 +16,19 @@ export type Journey = {
 	start_offset_ms: number;
 	duration_ms: number;
 	/**
-	 * Single offset applied at playback time:
-	 * effective_start = start_offset_ms - latency_compensation_ms.
-	 * Initialized at record-time to AudioContext.outputLatency * 1000
-	 * (the OS's best guess; unreliable on Bluetooth). User can mutate
-	 * it via ear-nudge controls during playback. Clamped ±2000 ms.
+	 * Delta applied to the recording's start position at playback:
+	 * effective_start = start_offset_ms + playback_offset_ms.
+	 *
+	 * Sign convention follows DAW / LRC convention: positive shifts
+	 * the recording later in map-time, negative earlier. Initialized
+	 * at record-time to -(AudioContext.outputLatency * 1000) — a
+	 * rough hint, unreliable on Bluetooth and headphones. Users
+	 * adjust by ear via nudge controls. If a future automatic
+	 * calibration source is added, it should live in its own field
+	 * and be summed with this one at playback.
+	 *
+	 * Clamped to ±2000 ms.
 	 */
-	latency_compensation_ms: number;
+	playback_offset_ms: number;
 	audio: { mime: string };
 };

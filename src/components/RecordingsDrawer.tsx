@@ -57,13 +57,31 @@ export function RecordingsDrawer({
 		>
 			<div
 				style={{
-					padding: "10px 12px",
+					padding: "8px 12px",
 					borderBottom: "1px solid #2a2a2a",
-					fontSize: 13,
-					color: "#aaa",
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: 8,
 				}}
 			>
-				Recordings
+				<span style={{ fontSize: 13, color: "#aaa" }}>Recordings</span>
+				<button
+					type="button"
+					onClick={onClose}
+					aria-label="Close recordings drawer"
+					style={{
+						padding: "2px 8px",
+						fontSize: 12,
+						background: "transparent",
+						color: "#aaa",
+						border: "1px solid #444",
+						borderRadius: 4,
+						cursor: "pointer",
+					}}
+				>
+					Close
+				</button>
 			</div>
 
 			<div style={{ flex: 1, overflowY: "auto" }}>
@@ -155,8 +173,8 @@ function RecordingRow({
 
 	const created = new Date(journey.created_at);
 	const label = formatRecordingLabel(journey.duration_ms, created);
-	const offsetSign = journey.latency_compensation_ms > 0 ? "+" : "";
-	const offsetText = `${offsetSign}${journey.latency_compensation_ms} ms`;
+	const offsetSign = journey.playback_offset_ms > 0 ? "+" : "";
+	const offsetText = `${offsetSign}${journey.playback_offset_ms} ms`;
 
 	return (
 		<div
