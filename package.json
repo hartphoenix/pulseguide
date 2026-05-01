@@ -7,7 +7,7 @@
 	"repository": "https://github.com/hartphoenix/pulseguide.git",
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build",
+		"build": "vite build && cp dist/index.html dist/404.html",
 		"preview": "vite preview",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
@@ -16,7 +16,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"pulsemap": "github:hartphoenix/pulsemap",
+		"pulsemap": "github:hartphoenix/pulsemap#f544942",
 		"react": "^19.2.5",
 		"react-dom": "^19.2.5",
 		"react-router-dom": "^7.14.2"

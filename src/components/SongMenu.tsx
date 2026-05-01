@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { manifestUrl } from "../maps/source";
 
 interface MapEntry {
 	file: string;
@@ -20,7 +21,7 @@ export function SongMenu() {
 	const [sortAsc, setSortAsc] = useState(true);
 
 	useEffect(() => {
-		fetch("/maps/manifest.json")
+		fetch(manifestUrl())
 			.then((res) => res.json())
 			.then((data: MapEntry[]) => setMaps(data))
 			.catch(() => {});

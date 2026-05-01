@@ -8,7 +8,7 @@ import "./fonts.css";
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<BrowserRouter>
+		<BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
 			<Routes>
 				<Route path="/" element={<SongMenu />} />
 				<Route path="/song/:mapId" element={<Player />} />
