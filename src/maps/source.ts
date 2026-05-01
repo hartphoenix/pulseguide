@@ -1,5 +1,5 @@
 const ENV_BASE = import.meta.env.VITE_MAP_BASE_URL as string | undefined;
-const PROD_DEFAULT = "https://raw.githubusercontent.com/hartphoenix/pulsemap/main";
+const PROD_DEFAULT = "https://hartphoenix.github.io/pulsemap";
 
 function externalBase(): string | null {
 	if (ENV_BASE) return ENV_BASE.replace(/\/$/, "");
