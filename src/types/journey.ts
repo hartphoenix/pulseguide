@@ -1,8 +1,16 @@
 /**
  * Local journey: a sidecar JSON describing one user-recorded audio
- * track over a map. Lean MVP shape; will likely diverge from the
- * canonical PulseMap journey spec (which still lives only in PRD
- * prose). Bump `version` when migrating.
+ * track over a map. Lean MVP shape; runs ahead of the upstream
+ * suggested reference shape in `pulsemap/schema/journey`
+ * (RecordingJourney) at version "0.2".
+ *
+ * Journeys are an OPEN LAYER in the PulseMap protocol — PulseMap
+ * does not own this schema and will not break it. PulseGuide may
+ * stay on its own version of this type indefinitely if the local
+ * shape diverges from upstream; that's by design. If/when this
+ * shape converges with `RecordingJourney` upstream, swap to
+ * `import type { RecordingJourney } from "pulsemap/schema/journey"`
+ * and migrate any divergent fields explicitly.
  *
  * The audio Blob is stored separately in the `audioBlobs` IndexedDB
  * store, keyed by the same `id`.
