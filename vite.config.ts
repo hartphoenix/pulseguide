@@ -57,6 +57,7 @@ function pulsemapMapsPlugin() {
 	};
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+	base: command === "build" ? "/pulseguide/" : "/",
 	plugins: [react(), pulsemapMapsPlugin()],
-});
+}));

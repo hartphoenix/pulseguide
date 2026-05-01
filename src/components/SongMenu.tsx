@@ -1,15 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { manifestUrl } from "../maps/source";
 
 interface MapEntry {
 	file: string;
-	path: string;
 	id: string;
-	title: string;
-	artist: string;
-	hasLyrics: boolean;
-	hasWords: boolean;
-	hasChords: boolean;
+	title?: string;
+	artist?: string;
 }
 
 type SortKey = "title" | "artist";
@@ -20,7 +17,7 @@ export function SongMenu() {
 	const [sortAsc, setSortAsc] = useState(true);
 
 	useEffect(() => {
-		fetch("/maps/manifest.json")
+		fetch(manifestUrl())
 			.then((res) => res.json())
 			.then((data: MapEntry[]) => setMaps(data))
 			.catch(() => {});
@@ -35,9 +32,12 @@ export function SongMenu() {
 		}
 	}
 
+	const titleOf = (m: MapEntry) => m.title ?? m.file;
+	const artistOf = (m: MapEntry) => m.artist ?? "Unknown";
+
 	const sorted = [...maps].sort((a, b) => {
-		const av = a[sortKey].toLowerCase();
-		const bv = b[sortKey].toLowerCase();
+		const av = (sortKey === "title" ? titleOf(a) : artistOf(a)).toLowerCase();
+		const bv = (sortKey === "title" ? titleOf(b) : artistOf(b)).toLowerCase();
 		const cmp = av < bv ? -1 : av > bv ? 1 : 0;
 		return sortAsc ? cmp : -cmp;
 	});
@@ -140,7 +140,7 @@ export function SongMenu() {
 												textDecoration: "none",
 											}}
 										>
-											{m.title}
+											{titleOf(m)}
 										</Link>
 									</td>
 									<td style={{ padding: 0 }}>
@@ -153,7 +153,7 @@ export function SongMenu() {
 												textDecoration: "none",
 											}}
 										>
-											{m.artist}
+											{artistOf(m)}
 										</Link>
 									</td>
 								</tr>

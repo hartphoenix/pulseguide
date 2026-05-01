@@ -1,5 +1,5 @@
 @font-face {
 	font-family: "Leland Text";
-	src: url("/fonts/LelandText.otf") format("opentype");
+	src: url("./assets/LelandText.otf") format("opentype");
 	font-display: swap;
 }

@@ -2,6 +2,7 @@ import { YouTubeEmbedAdapter } from "pulsemap/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { mapUrl } from "../maps/source";
 import {
 	type RecordingSession,
 	type RecordingStartedInfo,
@@ -89,7 +90,7 @@ export function Player() {
 		adapterRef.current?.destroy();
 		adapterRef.current = null;
 
-		fetch(`/maps/${mapId}.json`)
+		fetch(mapUrl(mapId))
 			.then((res) => {
 				if (!res.ok) throw new Error("not found");
 				return res.json();
