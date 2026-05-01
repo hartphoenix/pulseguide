@@ -1,4 +1,4 @@
-import { YouTubeEmbedAdapter } from "pulsemap/sdk";
+import { openEditor, YouTubeEmbedAdapter } from "pulsemap/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMediaQuery } from "../hooks/useMediaQuery";
@@ -19,7 +19,6 @@ import type { SyncState } from "../sync/engine";
 import { SyncEngine } from "../sync/engine";
 import type { Journey } from "../types/journey";
 import type { PulseMap } from "../types/pulsemap";
-import { openEditor } from "../utils/editor";
 import { DebugPanel } from "./DebugPanel";
 import { DrawerToggle } from "./DrawerToggle";
 import { LyricsChordDisplay } from "./LyricsChordDisplay";
