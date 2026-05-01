@@ -6,9 +6,9 @@ Synced lead-sheet player for the [PulseMap](https://github.com/hartphoenix/pulse
 
 **Live at <https://hartphoenix.github.io/pulseguide/>.** Pick any song from the catalog to try it.
 
-<!-- TODO(SCREENSHOT): docs/screenshots/leadsheet.png — Pulseguide showing chords-over-words and section labels for a recognizable song. Replace this comment with: ![Pulseguide playing a song](docs/screenshots/leadsheet.png) -->
+![PulseGuide playing Blackbird — chord chart over synced lyrics](docs/screenshots/leadsheet.png)
 
-<!-- TODO(SCREENSHOT): docs/screenshots/recordings-drawer.png — the recordings drawer with a saved journey. -->
+![Recordings drawer open with offset-nudge controls](docs/screenshots/recordings-drawer.png)
 
 ## What it does
 
