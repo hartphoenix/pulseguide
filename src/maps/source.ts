@@ -9,7 +9,7 @@ function externalBase(): string | null {
 
 export function manifestUrl(): string {
 	const ext = externalBase();
-	return ext ? `${ext}/manifest.json` : "/maps/manifest.json";
+	return ext ? `${ext}/maps/manifest.json` : "/maps/manifest.json";
 }
 
 export function mapUrl(mapId: string): string {
