@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Player } from "./components/Player";
 import { SongMenu } from "./components/SongMenu";
+import "./theme.css";
 import "./fonts.css";
 
 createRoot(document.getElementById("root")!).render(

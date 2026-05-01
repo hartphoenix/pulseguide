@@ -1,0 +1,37 @@
+:root {
+	--bg-deep: #0b0908;
+	--bg: #14100e;
+	--bg-surface: #1c1816;
+	--bg-hover: #262020;
+
+	--text: #b8a498;
+	--text-h: #f5ebe0;
+	--text-muted: #7a6a5e;
+
+	--accent: #d4a050;
+	--accent-dim: rgba(212, 160, 80, 0.12);
+	--accent-glow: rgba(212, 160, 80, 0.2);
+	--accent-secondary: #c48a40;
+
+	--border: #2a2220;
+	--border-glow: rgba(212, 160, 80, 0.1);
+
+	--record: #d04545;
+	--record-bg: #2a1414;
+	--record-glow: rgba(208, 69, 69, 0.25);
+
+	--active-green: #5fa75f;
+	--active-green-bg: #1a2c1a;
+
+	--sans: system-ui, "Segoe UI", Roboto, sans-serif;
+	--heading: "Kanit", system-ui, "Segoe UI", Roboto, sans-serif;
+	--mono: ui-monospace, Consolas, monospace;
+
+	color-scheme: dark;
+}
+
+body {
+	background: var(--bg-deep);
+	color: var(--text);
+	font-family: var(--sans);
+}

@@ -9,24 +9,35 @@ any mapped song with interactive playback control.
 
 ```
 src/
-  adapters/          # Re-exports from pulsemap SDK (PlaybackAdapter, YouTubeEmbedAdapter)
-  components/        # React display components
+  main.tsx             # Entry point: BrowserRouter + route definitions
+  fonts.css            # @font-face for Leland Text (chord display font)
+  vite-env.d.ts        # Vite client types (CSS module support)
+  adapters/            # Re-exports from pulsemap SDK (PlaybackAdapter, YouTubeEmbedAdapter)
+  components/
+    SongMenu.tsx         # Landing page: sortable song table (Title, Artist)
+    Player.tsx           # Player view: video + controls + lead sheet for a single song
     LyricsChordDisplay.tsx  # Lead sheet: lyrics + chords + sections + measures
     VideoPlayer.tsx         # YouTube embed with expanded/minimized modes
     PlaybackControls.tsx    # Seek, play/pause, speed, volume, mute
-    MapLoader.tsx           # Demo map dropdown + file picker
     DebugPanel.tsx          # Dev: raw sync state display
-  hooks/             # useMediaQuery for responsive layout
-  sync/              # SyncEngine (polls adapter, resolves map events)
-  types/             # Re-exports from pulsemap/schema
-extension/           # Chrome Manifest v3 extension (Phase 4)
-vite.config.ts       # Includes dev plugin to serve maps from pulsemap repo
+  display/
+    layout.ts            # buildEntries, alignWordsToLine, buildMeasures
+    format-chord.ts      # Unicode chord formatting (# → ♯, b → ♭)
+    measure-text.ts      # Canvas-based text width measurement
+  hooks/               # useMediaQuery for responsive layout
+  sync/                # SyncEngine (polls adapter, resolves map events)
+  types/               # Re-exports from pulsemap/schema
+public/
+  fonts/LelandText.otf # Leland Text font (MuseScore SMuFL, SIL-licensed)
+extension/             # Chrome Manifest v3 extension (Phase 4)
+vite.config.ts         # Includes dev plugin to serve maps from pulsemap repo
 ```
 
 ### Tech stack
 
 - **Runtime:** Bun
 - **Framework:** React 19 + TypeScript + Vite
+- **Routing:** react-router-dom (BrowserRouter)
 - **Linting:** Biome
 - **Testing:** bun:test
 - **Protocol dependency:** `pulsemap` via `github:hartphoenix/pulsemap`
@@ -76,6 +87,11 @@ not yet implemented.
 
 ### Architecture
 
+**Routing.** Two routes: `/` renders `SongMenu` (sortable table of
+all mapped songs), `/song/:mapId` renders `Player` (full player view
+for one song). Each song has a stable URL using the map's UUID.
+Browser back button navigates between menu and player.
+
 **Adapters** (from pulsemap SDK) wrap platform-specific APIs behind
 `PlaybackAdapter`. The SDK provides the interface, URL matching via
 `AdapterMatcher` + `createRegistry()`, and reference implementations.
@@ -85,6 +101,14 @@ Pulseguide consumes `YouTubeEmbedAdapter` from the SDK.
 lyric line, word, chord, section, and beat from the map, and emits
 `SyncState` to subscribers. BPM and time signature are sparse change
 events — the engine carries forward the last-seen value.
+
+**Chord formatting.** `formatChord()` in `src/display/format-chord.ts`
+replaces ASCII accidentals with Unicode at render time (`#` → `♯`,
+`b` → `♭`, `##` → `×`, `bb` → `𝄫`). Only targets accidentals after
+root notes (A-G) and bass notes (after `/`); quality text like `dim`,
+`sus`, `m` is untouched. Leland Text font (MuseScore SMuFL, SIL
+Open Font License) is applied to all chord display elements for a
+lead-sheet appearance.
 
 **LyricsChordDisplay** renders the lead sheet. Key design decisions:
 
@@ -97,10 +121,13 @@ events — the engine carries forward the last-seen value.
   Earlier approaches using sequential cursors failed on edge cases.
 
 - **Chord boundaries use `line.t`** (the phrase's canonical position
-  in the song), not the first word's timestamp. Lyric line `end`
-  timestamps from upstream sources can extend far past the actual
-  lyrics (to the next line's start), which swallows instrumental
-  breaks. Using `line.t` prevents this.
+  in the song), not the first word's timestamp. LRCLIB `end`
+  timestamps on lyric lines are always "next line start," not when
+  the vocal actually ends — this is a known LRCLIB characteristic,
+  not a bug. Using raw `end` values would swallow instrumental
+  breaks. Using `line.t` prevents this. The `words` array (from
+  WhisperX) is the authoritative timing source for when vocals
+  actually occur.
 
 - **Words only highlight when their parent line is active.** The
   sync engine tracks the current word from the flat `words[]` array
@@ -118,12 +145,36 @@ events — the engine carries forward the last-seen value.
   with bar lines from beat downbeat data. Small groups render as
   an inline row.
 
-**VideoPlayer** has expanded and minimized modes. The YouTube iframe
-stays mounted in the DOM at all times (positioned offscreen when
-minimized) so the API remains functional. The component must always
-render in the same position in the React tree — moving it between
-conditional branches causes React to remount it, destroying the
-iframe and breaking playback.
+**Scroll modes.** Two modes, toggled automatically:
+
+- **Follow** (default): auto-scrolls to the active line at 15% from
+  the top of the scroll container. Chord changes also drive scrolling
+  via `data-chord-t` DOM attributes — during instrumental passages
+  or long lyric lines, the view scrolls progressively through chord
+  elements rather than parking on one position.
+- **Free**: activated when the user scrolls manually during playback.
+  Highlights continue updating but auto-scroll stops. A "Follow
+  playback" pill button appears at center-bottom of the lyrics
+  container; clicking it re-engages follow mode.
+
+A `programmaticScroll` ref guards against auto-scroll events
+triggering free mode. The guard clears after 150ms (smooth scroll
+animation settle time).
+
+**VideoPlayer** starts minimized by default. The YouTube iframe stays
+mounted in the DOM at all times (positioned offscreen when minimized)
+so the API remains functional. The component must always render in the
+same position in the React tree — moving it between conditional
+branches causes React to remount it, destroying the iframe and
+breaking playback.
+
+### Known issues
+
+- **`bun run typecheck` fails** because the installed `pulsemap`
+  package (from GitHub) is behind the local source — missing
+  `WordEvent`, `PlaybackRestrictions` types and the `words` field on
+  `PulseMap`. Fix: symlink local pulsemap into node_modules, or
+  push the latest pulsemap schema and reinstall.
 
 ### Biome rule overrides
 

@@ -48,27 +48,41 @@ export function SongMenu() {
 		<div
 			style={{
 				minHeight: "100vh",
-				background: "#0a0a0a",
-				color: "#ddd",
-				padding: "40px 20px",
+				background: "var(--bg-deep)",
+				color: "var(--text)",
+				padding: "60px 24px",
 			}}
 		>
-			<div style={{ maxWidth: 640, margin: "0 auto" }}>
+			<div style={{ maxWidth: 720, margin: "0 auto" }}>
 				<h1
 					style={{
-						fontSize: 28,
-						fontWeight: 700,
-						marginBottom: 4,
+						fontFamily: "var(--heading)",
+						fontWeight: 300,
+						fontSize: "clamp(2.5rem, 7vw, 4.5rem)",
+						letterSpacing: "-0.02em",
+						lineHeight: 1.1,
+						textTransform: "lowercase",
+						margin: "0 0 8px",
+						background: "linear-gradient(135deg, #e8c070 0%, #d4a050 40%, #c48a40 80%)",
+						WebkitBackgroundClip: "text",
+						WebkitTextFillColor: "transparent",
+						backgroundClip: "text",
 					}}
 				>
-					PulseGuide
+					pulseguide
 				</h1>
-				<p style={{ color: "#888", fontSize: 14, marginBottom: 32 }}>
+				<p
+					style={{
+						color: "var(--text-muted)",
+						fontSize: 14,
+						marginBottom: 36,
+					}}
+				>
 					{maps.length} {maps.length === 1 ? "song" : "songs"} mapped
 				</p>
 
 				{maps.length === 0 ? (
-					<p style={{ color: "#555" }}>Loading...</p>
+					<p style={{ color: "var(--text-muted)" }}>Loading…</p>
 				) : (
 					<table
 						style={{
@@ -78,19 +92,22 @@ export function SongMenu() {
 						}}
 					>
 						<thead>
-							<tr style={{ borderBottom: "1px solid #333" }}>
+							<tr style={{ borderBottom: "1px solid var(--border)" }}>
 								<th
 									onClick={() => handleSort("title")}
 									style={{
 										textAlign: "left",
 										padding: "10px 8px",
 										cursor: "pointer",
-										fontWeight: 600,
-										color: sortKey === "title" ? "#ddd" : "#888",
+										fontFamily: "var(--heading)",
+										fontWeight: 500,
+										letterSpacing: "0.04em",
+										textTransform: "lowercase",
+										color: sortKey === "title" ? "var(--accent)" : "var(--text-muted)",
 										userSelect: "none",
 									}}
 								>
-									Title{sortKey === "title" && arrow}
+									title{sortKey === "title" && arrow}
 								</th>
 								<th
 									onClick={() => handleSort("artist")}
@@ -98,25 +115,28 @@ export function SongMenu() {
 										textAlign: "left",
 										padding: "10px 8px",
 										cursor: "pointer",
-										fontWeight: 600,
-										color: sortKey === "artist" ? "#ddd" : "#888",
+										fontFamily: "var(--heading)",
+										fontWeight: 500,
+										letterSpacing: "0.04em",
+										textTransform: "lowercase",
+										color: sortKey === "artist" ? "var(--accent)" : "var(--text-muted)",
 										userSelect: "none",
 									}}
 								>
-									Artist{sortKey === "artist" && arrow}
+									artist{sortKey === "artist" && arrow}
 								</th>
 							</tr>
 						</thead>
 						<tbody>
 							{sorted.map((m) => (
-								<tr key={m.id} style={{ borderBottom: "1px solid #1a1a1a" }}>
+								<tr key={m.id} style={{ borderBottom: "1px solid rgba(42, 34, 32, 0.5)" }}>
 									<td style={{ padding: 0 }}>
 										<Link
 											to={`/song/${m.id}`}
 											style={{
 												display: "block",
 												padding: "10px 8px",
-												color: "#ddd",
+												color: "var(--text-h)",
 												textDecoration: "none",
 											}}
 										>
@@ -129,7 +149,7 @@ export function SongMenu() {
 											style={{
 												display: "block",
 												padding: "10px 8px",
-												color: "#999",
+												color: "var(--text-muted)",
 												textDecoration: "none",
 											}}
 										>
