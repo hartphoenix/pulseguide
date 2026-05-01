@@ -1,3 +1,4 @@
+import { type EditorTarget, openEditor } from "pulsemap/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatChord } from "../display/format-chord";
 import {
@@ -11,7 +12,6 @@ import {
 } from "../display/layout";
 import { measureTextWidth, wordOffsets } from "../display/measure-text";
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
-import { type EditorTarget, openEditor } from "../utils/editor";
 import { ContextMenu } from "./ContextMenu";
 
 interface MenuState {
