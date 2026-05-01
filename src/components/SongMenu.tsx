@@ -78,7 +78,15 @@ export function SongMenu() {
 						marginBottom: 36,
 					}}
 				>
-					{maps.length} {maps.length === 1 ? "song" : "songs"} mapped
+					{maps.length} {maps.length === 1 ? "song" : "songs"} mapped · built with{" "}
+					<a
+						href="https://github.com/hartphoenix/pulsemap#pulsemap"
+						target="_blank"
+						rel="noopener noreferrer"
+						style={{ color: "var(--accent)", textDecoration: "none" }}
+					>
+						pulsemap
+					</a>
 				</p>
 
 				{maps.length === 0 ? (
