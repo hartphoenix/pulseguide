@@ -1,6 +1,8 @@
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
 
 // ms window for associating a chord with the start of a lyric line (pickup chords).
+// 500ms catches syncopated chord changes (pushed ahead of the beat) without pulling
+// in chords from an adjacent passage.
 export const CHORD_WORD_TOLERANCE = 500;
 
 // Fallback chord window past last word when beat data is unavailable.
@@ -152,6 +154,10 @@ export function buildEntries(
 		const line = lyrics[i];
 		const lineWords = alignWordsToLine(line.text, line.t, words, usedWordIndices, matchWindow);
 
+		// Chord window starts from line.t (the phrase's canonical position), not the
+		// first word's timestamp or the line's end. LRCLIB end timestamps extend to
+		// the next line's start — often minutes later if there's an instrumental
+		// break — so using end would swallow entire solo sections into one lyric line.
 		const chordStart = line.t - CHORD_WORD_TOLERANCE;
 		const nextLineT = i < lyrics.length - 1 ? lyrics[i + 1].t : Number.POSITIVE_INFINITY;
 

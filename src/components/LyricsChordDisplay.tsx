@@ -11,7 +11,17 @@ import {
 } from "../display/layout";
 import { measureTextWidth, wordOffsets } from "../display/measure-text";
 import type { BeatEvent, ChordEvent, LyricLine, Section, WordEvent } from "../types/pulsemap";
-import { openEditor } from "../utils/editor";
+import { type EditorTarget, openEditor } from "../utils/editor";
+import { ContextMenu } from "./ContextMenu";
+
+interface MenuState {
+	x: number;
+	y: number;
+	target: EditorTarget;
+	label: string;
+}
+
+type ShowMenu = (e: React.MouseEvent, target: EditorTarget, label: string) => void;
 
 // Active line sits at 15% from top of scroll container (Hart specified 10-20%).
 const SCROLL_TARGET_RATIO = 0.15;
@@ -27,12 +37,14 @@ function ChordRow({
 	onSeek,
 	mapId,
 	allChords,
+	showMenu,
 }: {
 	chords: ChordEvent[];
 	position: number;
 	onSeek: (ms: number) => void;
 	mapId: string;
 	allChords: ChordEvent[];
+	showMenu: ShowMenu;
 }) {
 	return (
 		<div
@@ -41,7 +53,7 @@ function ChordRow({
 				fontSize: 15,
 				fontWeight: 600,
 				fontFamily: CHORD_FONT_FAMILY,
-				color: "#e8b84b",
+				color: "var(--accent)",
 				cursor: "pointer",
 				display: "flex",
 				flexWrap: "wrap",
@@ -57,13 +69,17 @@ function ChordRow({
 						onContextMenu={(e) => {
 							e.preventDefault();
 							e.stopPropagation();
-							openEditor({
-								mapId,
-								t: c.t,
-								lane: "chords",
-								index: allChords.findIndex((x) => x.t === c.t),
-								source: "pulseguide",
-							});
+							showMenu(
+								e,
+								{
+									mapId,
+									t: c.t,
+									lane: "chords",
+									index: allChords.findIndex((x) => x.t === c.t),
+									source: "pulseguide",
+								},
+								"Correct this chord",
+							);
 						}}
 						style={{
 							marginRight: 16,
@@ -85,12 +101,14 @@ function MeasureChart({
 	onSeek,
 	mapId,
 	allChords,
+	showMenu,
 }: {
 	measures: Measure[];
 	position: number;
 	onSeek: (ms: number) => void;
 	mapId: string;
 	allChords: ChordEvent[];
+	showMenu: ShowMenu;
 }) {
 	if (!measures.length) return null;
 
@@ -131,16 +149,20 @@ function MeasureChart({
 												onContextMenu={(e) => {
 													e.preventDefault();
 													e.stopPropagation();
-													openEditor({
-														mapId,
-														t: c.t,
-														lane: "chords",
-														index: allChords.findIndex((x) => x.t === c.t),
-														source: "pulseguide",
-													});
+													showMenu(
+														e,
+														{
+															mapId,
+															t: c.t,
+															lane: "chords",
+															index: allChords.findIndex((x) => x.t === c.t),
+															source: "pulseguide",
+														},
+														"Correct this chord",
+													);
 												}}
 												style={{
-													color: chordActive ? "#e8b84b" : "#777",
+													color: chordActive ? "var(--accent)" : "#777",
 													fontWeight: chordActive ? 600 : 400,
 													transition: "color 0.1s",
 													marginRight: 8,
@@ -210,6 +232,7 @@ function ChordWordLine({
 	allChords,
 	allWords,
 	allLyrics,
+	showMenu,
 }: {
 	entry: Extract<DisplayEntry, { kind: "lyric" }>;
 	activeLineT: number | null;
@@ -220,6 +243,7 @@ function ChordWordLine({
 	allChords: ChordEvent[];
 	allWords: WordEvent[];
 	allLyrics: LyricLine[];
+	showMenu: ShowMenu;
 }) {
 	const isActiveLine = entry.line.t === activeLineT;
 	const hasChords = entry.chords.length > 0;
@@ -242,7 +266,7 @@ function ChordWordLine({
 							fontSize: 14,
 							fontWeight: 600,
 							fontFamily: CHORD_FONT_FAMILY,
-							color: "#e8b84b",
+							color: "var(--accent)",
 							marginBottom: 2,
 						}}
 					>
@@ -257,13 +281,17 @@ function ChordWordLine({
 								onContextMenu={(e) => {
 									e.preventDefault();
 									e.stopPropagation();
-									openEditor({
-										mapId,
-										t: c.t,
-										lane: "chords",
-										index: allChords.findIndex((x) => x.t === c.t),
-										source: "pulseguide",
-									});
+									showMenu(
+										e,
+										{
+											mapId,
+											t: c.t,
+											lane: "chords",
+											index: allChords.findIndex((x) => x.t === c.t),
+											source: "pulseguide",
+										},
+										"Correct this chord",
+									);
 								}}
 								style={{ cursor: "pointer", whiteSpace: "nowrap" }}
 							>
@@ -278,13 +306,17 @@ function ChordWordLine({
 					onContextMenu={(e) => {
 						e.preventDefault();
 						e.stopPropagation();
-						openEditor({
-							mapId,
-							t: entry.line.t,
-							lane: "lyrics",
-							index: allLyrics.findIndex((x) => x.t === entry.line.t),
-							source: "pulseguide",
-						});
+						showMenu(
+							e,
+							{
+								mapId,
+								t: entry.line.t,
+								lane: "lyrics",
+								index: allLyrics.findIndex((x) => x.t === entry.line.t),
+								source: "pulseguide",
+							},
+							"Correct this lyric",
+						);
 					}}
 					style={{
 						display: "block",
@@ -316,13 +348,17 @@ function ChordWordLine({
 			onContextMenu={(e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				openEditor({
-					mapId,
-					t: entry.line.t,
-					lane: "lyrics",
-					index: allLyrics.findIndex((x) => x.t === entry.line.t),
-					source: "pulseguide",
-				});
+				showMenu(
+					e,
+					{
+						mapId,
+						t: entry.line.t,
+						lane: "lyrics",
+						index: allLyrics.findIndex((x) => x.t === entry.line.t),
+						source: "pulseguide",
+					},
+					"Correct this lyric",
+				);
 			}}
 			role="button"
 			tabIndex={0}
@@ -343,7 +379,7 @@ function ChordWordLine({
 						fontSize: 14,
 						fontWeight: 600,
 						fontFamily: CHORD_FONT_FAMILY,
-						color: "#e8b84b",
+						color: "var(--accent)",
 						marginBottom: 2,
 					}}
 				>
@@ -358,13 +394,17 @@ function ChordWordLine({
 							onContextMenu={(e) => {
 								e.preventDefault();
 								e.stopPropagation();
-								openEditor({
-									mapId,
-									t: c.t,
-									lane: "chords",
-									index: allChords.findIndex((x) => x.t === c.t),
-									source: "pulseguide",
-								});
+								showMenu(
+									e,
+									{
+										mapId,
+										t: c.t,
+										lane: "chords",
+										index: allChords.findIndex((x) => x.t === c.t),
+										source: "pulseguide",
+									},
+									"Correct this chord",
+								);
 							}}
 							style={{
 								position: "absolute",
@@ -391,13 +431,17 @@ function ChordWordLine({
 						onContextMenu={(e) => {
 							e.preventDefault();
 							e.stopPropagation();
-							openEditor({
-								mapId,
-								t: word.t,
-								lane: "words",
-								index: allWords.findIndex((x) => x.t === word.t),
-								source: "pulseguide",
-							});
+							showMenu(
+								e,
+								{
+									mapId,
+									t: word.t,
+									lane: "words",
+									index: allWords.findIndex((x) => x.t === word.t),
+									source: "pulseguide",
+								},
+								"Correct this word",
+							);
 						}}
 						style={{
 							cursor: "pointer",
@@ -426,6 +470,7 @@ function renderChordEntry(
 	beats: BeatEvent[],
 	mapId: string,
 	allChords: ChordEvent[],
+	showMenu: ShowMenu,
 ) {
 	if (entry.chords.length <= MEASURE_CHART_THRESHOLD) {
 		return (
@@ -436,6 +481,7 @@ function renderChordEntry(
 				onSeek={onSeek}
 				mapId={mapId}
 				allChords={allChords}
+				showMenu={showMenu}
 			/>
 		);
 	}
@@ -455,6 +501,7 @@ function renderChordEntry(
 			onSeek={onSeek}
 			mapId={mapId}
 			allChords={allChords}
+			showMenu={showMenu}
 		/>
 	);
 }
@@ -473,6 +520,7 @@ function SectionBlock({
 	allWords,
 	allLyrics,
 	allSections,
+	showMenu,
 }: {
 	group: SectionGroup;
 	activeLineT: number | null;
@@ -487,6 +535,7 @@ function SectionBlock({
 	allWords: WordEvent[];
 	allLyrics: LyricLine[];
 	allSections: Section[];
+	showMenu: ShowMenu;
 }) {
 	const label = formatSectionLabel(group.section);
 	const isActiveSection = activeSection?.t === group.section.t;
@@ -504,13 +553,17 @@ function SectionBlock({
 				onContextMenu={(e) => {
 					e.preventDefault();
 					e.stopPropagation();
-					openEditor({
-						mapId,
-						t: group.section.t,
-						lane: "sections",
-						index: allSections.findIndex((x) => x.t === group.section.t),
-						source: "pulseguide",
-					});
+					showMenu(
+						e,
+						{
+							mapId,
+							t: group.section.t,
+							lane: "sections",
+							index: allSections.findIndex((x) => x.t === group.section.t),
+							source: "pulseguide",
+						},
+						"Correct this section",
+					);
 				}}
 				style={{
 					width: 80,
@@ -518,7 +571,7 @@ function SectionBlock({
 					paddingTop: 6,
 					fontSize: 13,
 					fontWeight: 500,
-					color: isActiveSection ? "#6ba3d6" : "#555",
+					color: isActiveSection ? "var(--accent)" : "var(--text-muted)",
 					transition: "color 0.2s",
 					textAlign: "right",
 					userSelect: "none",
@@ -530,7 +583,7 @@ function SectionBlock({
 			<div style={{ flex: 1, minWidth: 0 }}>
 				{group.entries.map((entry) => {
 					if (entry.kind === "chords") {
-						return renderChordEntry(entry, position, onSeek, beats, mapId, allChords);
+						return renderChordEntry(entry, position, onSeek, beats, mapId, allChords, showMenu);
 					}
 					const isActive = entry.line.t === activeLineT;
 					return (
@@ -545,6 +598,7 @@ function SectionBlock({
 							allChords={allChords}
 							allWords={allWords}
 							allLyrics={allLyrics}
+							showMenu={showMenu}
 						/>
 					);
 				})}
@@ -595,6 +649,11 @@ export function LyricsChordDisplay({
 	const activeRef = useRef<HTMLDivElement>(null);
 	const [followMode, setFollowMode] = useState(true);
 	const programmaticScroll = useRef(false);
+	const [menuState, setMenuState] = useState<MenuState | null>(null);
+
+	const showMenu: ShowMenu = useCallback((e, target, label) => {
+		setMenuState({ x: e.clientX, y: e.clientY, target, label });
+	}, []);
 
 	const scrollToElement = useCallback((el: Element) => {
 		const container = containerRef.current;
@@ -683,6 +742,7 @@ export function LyricsChordDisplay({
 							allWords={words}
 							allLyrics={lyrics}
 							allSections={sections}
+							showMenu={showMenu}
 						/>
 					))}
 				</div>
@@ -713,6 +773,18 @@ export function LyricsChordDisplay({
 				>
 					Follow playback
 				</button>
+			)}
+			{menuState && (
+				<ContextMenu
+					x={menuState.x}
+					y={menuState.y}
+					label={menuState.label}
+					onAction={() => {
+						openEditor(menuState.target);
+						setMenuState(null);
+					}}
+					onClose={() => setMenuState(null)}
+				/>
 			)}
 		</div>
 	);

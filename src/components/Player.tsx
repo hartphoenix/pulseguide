@@ -22,8 +22,7 @@ import { openEditor } from "../utils/editor";
 import { DebugPanel } from "./DebugPanel";
 import { DrawerToggle } from "./DrawerToggle";
 import { LyricsChordDisplay } from "./LyricsChordDisplay";
-import { PlaybackControls } from "./PlaybackControls";
-import type { RecordState } from "./RecordButton";
+import { PlaybackControls, type RecordState } from "./PlaybackControls";
 import { RecordingsDrawer } from "./RecordingsDrawer";
 import { RecordingVolumeBar } from "./RecordingVolumeBar";
 import type { VideoMode } from "./VideoPlayer";
@@ -243,6 +242,14 @@ export function Player() {
 		return () => window.removeEventListener("beforeunload", handler);
 	}, [recordState]);
 
+	useEffect(() => {
+		return () => {
+			recordingSessionRef.current?.dispose();
+			recordingSessionRef.current = null;
+			recordingStartInfoRef.current = null;
+		};
+	}, []);
+
 	const handleRecordClick = useCallback(async () => {
 		if (recordState === "arming") return;
 		if (recordState === "recording") {
@@ -403,7 +410,7 @@ export function Player() {
 			<div
 				style={{
 					minHeight: "100vh",
-					background: "#0a0a0a",
+					background: "var(--bg-deep)",
 					color: "#ddd",
 					display: "flex",
 					flexDirection: "column",
@@ -413,7 +420,7 @@ export function Player() {
 				}}
 			>
 				<p>Map not found.</p>
-				<Link to="/" style={{ color: "#6ba3d6" }}>
+				<Link to="/" style={{ color: "var(--accent)" }}>
 					Back to songs
 				</Link>
 			</div>
@@ -429,7 +436,7 @@ export function Player() {
 				display: "flex",
 				flexDirection: landscape && showVideoExpanded ? "row" : "column",
 				height: "100vh",
-				background: "#0a0a0a",
+				background: "var(--bg-deep)",
 				color: "#ddd",
 				position: "relative",
 			}}
